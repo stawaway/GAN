@@ -17,7 +17,7 @@ def upsample(x):
 def downsample(x):
     """
     Function that downsamples an image to half its size
-    :param x: The current block of shape [batch, h, w, ch] to downsample
+    :param x: The current block of shape [batch_size, h, w, ch] to downsample
     :return: The downsampled block of shape [batch, 0.5*h, 0.5*w, ch]
     """
     h,w = tf.shape(x)[:2]
@@ -30,7 +30,7 @@ def downsample(x):
 def conv_lay(x, filter_size, num_filters, scope):
     """
     Functio that creates a convolutional layer that uses filters with the given size
-    :param x: Input layer of shape [batch, h, w, in_ch]
+    :param x: Input layer of shape [batch_size, h, w, in_ch]
     :param filter_size: The size of the filters to be applied in the convolution operation
     :param num_filters: The number of filter maps i.e. the number of output channels
     :param scope: Name that is given to the layer
@@ -55,12 +55,29 @@ def conv_lay(x, filter_size, num_filters, scope):
     return lay
 
 
-def dense_lay(x):
+def dense_lay(x, scope):
     """
     Fully connected layer
-    :param x:
-    :return: The new dense layer that was created
+    :param x: Input layer of shape [batch_size, h, w, in_ch]
+    :param scope: Name of the scope
+    :return: The new dense layer that was created of shape [batch_size, 1, 1, 1]
     """
+    with tf.variable_scope(scope):
+        h, w, in_ch = tf.shape(x)
+
+        init = tf.random_normal_initializer()
+
+        w = tf.get_variable(name="w", shape=[h,w, in_ch, 1],
+                            dtype=tf.float32, initializer=init, trainable=True)
+
+        lay = tf.nn.convolution(input=x, filter=w, padding="VALID")
+
+        b = tf.get_variable(name="bias", shape=[1, ],
+                            dtype=tf.float32, initializer=tf.zeros_initializer(dtype=tf.float32), trainable=True)
+
+        lay += b
+
+    return lay
 
 
 

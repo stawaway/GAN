@@ -52,28 +52,30 @@ def final_block(inp):
     :return:
     """
     # create sub-layer and feed the upscaled block
-    lay = util.conv_lay(inp, filter_size=[3, 3], num_filters=128, scope="G/1024x1024/lay:0")
+    lay = util.conv_lay(inp, filter_size=[3, 3], num_filters=128, scope="D/1024x1024/lay:0")
 
     # activation function
     lay = tf.nn.relu(lay)
 
     # next sub-layer
-    lay = util.conv_lay(lay, filter_size=[4, 4], num_filters=128, scope="G/1024x1024/lay:1")
+    lay = util.conv_lay(lay, filter_size=[4, 4], num_filters=128, scope="D/1024x1024/lay:1")
 
     # activation function
     lay = tf.nn.relu(lay)
 
     # fully-connected layer
+    lay = util.dense_lay(lay, "D/dense")
 
     return lay
 
 
-def make(batch_size):
+def make(inp):
     """
     Function that returns the discriminator network
-    :param batch_size: Size of the mini-batches
+    :param inp: Placeholder for input images of shape [batch_size, h, w, in_ch]
     :return: The constructed discriminator network
     """
+    batch_size = inp.shape[0].val
     # Create the first block for the network
     block = first_block(batch_size)
 
