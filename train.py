@@ -1,4 +1,5 @@
 import tensorflow as tf
+import numpy as np
 import gen
 import discr
 import util
@@ -16,15 +17,29 @@ def train(x):
     """
     Define placeholders to feed the data
     """
-    real = tf.placeholder(dtype=tf.float32, shape=[], name="input")
-    label = tf.placeholder(dtype=tf.float32, shape=[], name="label")
+    real = tf.placeholder(dtype=tf.float32, shape=[batch_size, 1024, 1024, 3], name="input")
+    label = tf.placeholder(dtype=tf.float32, shape=[batch_size, 1, 1, 1], name="label")
 
     """
     Create first blocks for both the generator and the discriminator networks and train
     """
 
-    gen_1 = gen.first_block(x, batch_size)
-    inp = gen_1
+    g = gen.make(batch_size)
 
-    discr_1 = discr.first_block(inp, batch_size)
+    inp = tf.placeholder(dtype=tf.float32, shape=[batch_size, 1024, 1024, 3], name="D-input")
+    d = discr.make(inp)
 
+    """
+    Create the loss function
+    """
+    loss = util.loss(logits=d, labels=label, name="Loss")
+
+    """
+    Create the optimizers that will minimize the loss function for D and maximize it for G
+    """
+    train_g = util.opt("G/Adam").minimize(-loss)
+    train_d = util.opt("D/Adam").minimize(loss)
+
+
+if __name__ == "__main__":
+    train(np.arange(3))

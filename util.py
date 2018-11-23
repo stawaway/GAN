@@ -7,9 +7,9 @@ def upsample(x):
     :param x: The current block to upsample. Of shape [batch, h, w, ch]
     :return: The upsampled block of shape [batch, 2*h, 2*w, ch]
     """
-    h, w = tf.shape(x)[:2]
+    h, w = x.shape[1:3]
 
-    up = tf.image.resize_images(x, size=[2*h, 2*w], method=tf.image.ResizeMethod.NEAREST_NEIGHBOUR)
+    up = tf.image.resize_images(x, size=[2*h, 2*w], method=tf.image.ResizeMethod.NEAREST_NEIGHBOR)
 
     return up
 
@@ -20,9 +20,10 @@ def downsample(x):
     :param x: The current block of shape [batch_size, h, w, ch] to downsample
     :return: The downsampled block of shape [batch, 0.5*h, 0.5*w, ch]
     """
-    h,w = tf.shape(x)[:2]
+    h,w = x.shape[1:3]
+    h, w = int(0.5 * h.value), int(0.5 * w.value)
 
-    down = tf.image.resize_images(x, size=[0.5*h, 0.5*w], method=tf.image.ResizeMethod.NEAREST_NEIGHBOUR)
+    down = tf.image.resize_images(x, size=[h, w], method=tf.image.ResizeMethod.NEAREST_NEIGHBOR)
 
     return down
 
@@ -38,7 +39,7 @@ def conv_lay(x, filter_size, num_filters, scope):
     """
 
     with tf.variable_scope(scope):
-        h, w, in_ch = tf.shape(x)
+        h, w, in_ch = x.shape[1:]
 
         init = tf.random_normal_initializer()
 
@@ -63,7 +64,7 @@ def dense_lay(x, scope):
     :return: The new dense layer that was created of shape [batch_size, 1, 1, 1]
     """
     with tf.variable_scope(scope):
-        h, w, in_ch = tf.shape(x)
+        h, w, in_ch = x.shape[1:]
 
         init = tf.random_normal_initializer()
 
@@ -80,15 +81,28 @@ def dense_lay(x, scope):
     return lay
 
 
-
-def loss(x, scope):
+def opt(scope):
     """
-    Function that returns the loss operation for the graph
-    :param x:
+    Function that returns the optimizer
     :param scope: Name of the scope to define the operation
-    :return: The operation that computes the loss
+    :return: The optimizer the will minimize the loss
     """
     with tf.variable_scope(scope):
         op = tf.train.AdamOptimizer(learning_rate=0.001, beta1=0., beta2=0.99, epsilon=1e-8)
 
     return op
+
+
+def loss(logits, labels, name):
+    """
+    Function that returns the loss operation
+    :param logits: Input layer from which we compute the loss
+    :param labels: True labels of the data i.e. 0 for a false image and 1 for a true image
+    :param name: Name of the operation
+    :return: The loss given the input
+    """
+    with tf.variable_scope(name):
+        loss = tf.nn.sigmoid_cross_entropy_with_logits(labels=labels, logits=logits)
+        loss = tf.reduce_mean(loss)
+
+    return loss
