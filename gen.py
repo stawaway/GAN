@@ -2,18 +2,17 @@ import tensorflow as tf
 import util
 
 
-def first_block(batch_size):
+def first_block(z):
     """
     Function that returns the first layer block
-    :param batch_size: Size of the mini-batches
+    :param z: Latent vector placeholder of size [batch_size, 1, 1, 512]
     :return:
     """
     # create first layer block
-    lay = tf.random_normal(shape=[batch_size, 1, 1, 512], name="latent", dtype=tf.float32)
-    lay = tf.image.resize_images(lay, size=[4, 4], method=tf.image.ResizeMethod.NEAREST_NEIGHBOR)
+    lay = tf.image.resize_images(z, size=[4, 4], method=tf.image.ResizeMethod.NEAREST_NEIGHBOR)
 
-    lay = util.conv_lay(lay, filter_size=[4, 4], num_filters=128, scope="G/4x4/lay_0")
-    lay = util.conv_lay(lay, filter_size=[3, 3], num_filters=128, scope="G/4x4/lay_1")
+    lay = util.conv_lay(lay, filter_size=[4, 4], num_filters=128, scope="G/4x4/lay_0", collection="GEN_VAR")
+    lay = util.conv_lay(lay, filter_size=[3, 3], num_filters=128, scope="G/4x4/lay_1", collection="GEN_VAR")
 
     return lay
 
@@ -30,13 +29,13 @@ def layer_block(inp, num_filters, name):
     lay = util.upsample(inp)
 
     # create sub-layer and feed the upscaled block
-    lay = util.conv_lay(lay, filter_size=[3, 3], num_filters=num_filters, scope=name+"/lay_0")
+    lay = util.conv_lay(lay, filter_size=[3, 3], num_filters=num_filters, scope=name+"/lay_0", collection="GEN_VAR")
 
     # activation function
     lay = tf.nn.relu(lay)
 
     # next sub-layer
-    lay = util.conv_lay(lay, filter_size=[3, 3], num_filters=num_filters, scope=name+"/lay_1")
+    lay = util.conv_lay(lay, filter_size=[3, 3], num_filters=num_filters, scope=name+"/lay_1", collection="GEN_VAR")
 
     # activation function
     lay = tf.nn.relu(lay)
@@ -54,31 +53,31 @@ def final_block(inp):
     lay = util.upsample(inp)
 
     # create sub-layer and feed the upscaled block
-    lay = util.conv_lay(lay, filter_size=[3, 3], num_filters=1024, scope="G/1024x1024/lay_0")
+    lay = util.conv_lay(lay, filter_size=[3, 3], num_filters=1024, scope="G/1024x1024/lay_0", collection="GEN_VAR")
 
     # activation function
     lay = tf.nn.relu(lay)
 
     # next sub-layer
-    lay = util.conv_lay(lay, filter_size=[3, 3], num_filters=1024, scope="G/1024x1024/lay_1")
+    lay = util.conv_lay(lay, filter_size=[3, 3], num_filters=1024, scope="G/1024x1024/lay_1", collection="GEN_VAR")
 
     # activation function
     lay = tf.nn.relu(lay)
 
     # next sub-layer
-    lay = util.conv_lay(lay, filter_size=[1, 1], num_filters=3, scope="G/1024x1024/lay_2")
+    lay = util.conv_lay(lay, filter_size=[1, 1], num_filters=3, scope="G/1024x1024/lay_2", collection="GEN_VAR")
 
     return lay
 
 
-def make(batch_size):
+def make(z):
     """
     Function that returns the generator network
-    :param batch_size: Size of the mini-batches
+    :param z: Placeholder for laten vector of shape [batch_size, 1, 1, 512]
     :return: The constructed generator network
     """
     # Create the first block for the network
-    block = first_block(batch_size)
+    block = first_block(z)
 
     # Create the other blocks for the generator
     for i in range(7):

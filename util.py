@@ -28,53 +28,59 @@ def downsample(x):
     return down
 
 
-def conv_lay(x, filter_size, num_filters, scope):
+def conv_lay(x, filter_size, num_filters, scope, collection):
     """
     Functio that creates a convolutional layer that uses filters with the given size
     :param x: Input layer of shape [batch_size, h, w, in_ch]
     :param filter_size: The size of the filters to be applied in the convolution operation
     :param num_filters: The number of filter maps i.e. the number of output channels
     :param scope: Name that is given to the layer
+    :param collection: Collection name to which we add the variables
     :return: The new layer that has been created
     """
 
-    with tf.variable_scope(scope):
+    with tf.variable_scope(scope, reuse=tf.AUTO_REUSE):
         h, w, in_ch = x.shape[1:]
 
         init = tf.random_normal_initializer()
 
         w = tf.get_variable(name="w", shape=filter_size+[in_ch, num_filters],
                             dtype=tf.float32, initializer=init, trainable=True)
+        tf.add_to_collection(collection, w)
 
         lay = tf.nn.convolution(input=x, filter=w, padding="SAME")
 
         b = tf.get_variable(name="bias", shape=[num_filters, ],
                             dtype=tf.float32, initializer=tf.zeros_initializer(dtype=tf.float32), trainable=True)
+        tf.add_to_collection(collection, b)
 
         lay += b
 
     return lay
 
 
-def dense_lay(x, scope):
+def dense_lay(x, scope, collection):
     """
     Fully connected layer
     :param x: Input layer of shape [batch_size, h, w, in_ch]
     :param scope: Name of the scope
+    :param collection: Collection name to which we add the variables
     :return: The new dense layer that was created of shape [batch_size, 1, 1, 1]
     """
-    with tf.variable_scope(scope):
+    with tf.variable_scope(scope, reuse=tf.AUTO_REUSE):
         h, w, in_ch = x.shape[1:]
 
         init = tf.random_normal_initializer()
 
         w = tf.get_variable(name="w", shape=[h,w, in_ch, 1],
                             dtype=tf.float32, initializer=init, trainable=True)
+        tf.add_to_collection(collection, w)
 
         lay = tf.nn.convolution(input=x, filter=w, padding="VALID")
 
         b = tf.get_variable(name="bias", shape=[1, ],
                             dtype=tf.float32, initializer=tf.zeros_initializer(dtype=tf.float32), trainable=True)
+        tf.add_to_collection(collection, b)
 
         lay += b
 

@@ -9,9 +9,9 @@ def first_block(inp):
     :return:
     """
     # create first layer block
-    lay = util.conv_lay(inp, filter_size=[1, 1], num_filters=4, scope="D/1024x1024/lay_0")
-    lay = util.conv_lay(lay, filter_size=[3, 3], num_filters=8, scope="D/1024x1024/lay_1")
-    lay = util.conv_lay(lay, filter_size=[3, 3], num_filters=8, scope="D/1024x1024/lay_2")
+    lay = util.conv_lay(inp, filter_size=[1, 1], num_filters=4, scope="D/1024x1024/lay_0", collection="DISCR_VAR")
+    lay = util.conv_lay(lay, filter_size=[3, 3], num_filters=8, scope="D/1024x1024/lay_1", collection="DISCR_VAR")
+    lay = util.conv_lay(lay, filter_size=[3, 3], num_filters=8, scope="D/1024x1024/lay_2", collection="DISCR_VAR")
     lay = util.downsample(lay)
 
     return lay
@@ -28,13 +28,13 @@ def layer_block(inp, num_filters, name):
     in_ch = inp.shape[-1].value
 
     # create sub-layer and feed the upscaled block
-    lay = util.conv_lay(inp, filter_size=[3, 3], num_filters=in_ch, scope=name+"/lay_0")
+    lay = util.conv_lay(inp, filter_size=[3, 3], num_filters=in_ch, scope=name+"/lay_0", collection="DISCR_VAR")
 
     # activation function
     lay = tf.nn.relu(lay)
 
     # next sub-layer
-    lay = util.conv_lay(lay, filter_size=[3, 3], num_filters=num_filters, scope=name+"/lay_1")
+    lay = util.conv_lay(lay, filter_size=[3, 3], num_filters=num_filters, scope=name+"/lay_1", collection="DISCR_VAR")
 
     # activation function
     lay = tf.nn.relu(lay)
@@ -52,26 +52,26 @@ def final_block(inp):
     :return:
     """
     # create sub-layer and feed the upscaled block
-    lay = util.conv_lay(inp, filter_size=[3, 3], num_filters=128, scope="D/4x4/lay_0")
+    lay = util.conv_lay(inp, filter_size=[3, 3], num_filters=128, scope="D/4x4/lay_0", collection="DISCR_VAR")
 
     # activation function
     lay = tf.nn.relu(lay)
 
     # next sub-layer
-    lay = util.conv_lay(lay, filter_size=[4, 4], num_filters=128, scope="D/4x4/lay_1")
+    lay = util.conv_lay(lay, filter_size=[4, 4], num_filters=128, scope="D/4x4/lay_1", collection="DISCR_VAR")
 
     # activation function
     lay = tf.nn.relu(lay)
 
     # fully-connected layer
-    lay = util.dense_lay(lay, "D/4x4/dense")
+    lay = util.dense_lay(lay, "D/4x4/dense", collection="DISCR_VAR")
 
     return lay
 
 
 def make(inp):
     """
-    Function that returns the discriminator network
+    Function that returns a discriminator network
     :param inp: Placeholder for input images of shape [batch_size, h, w, in_ch]
     :return: The constructed discriminator network
     """
