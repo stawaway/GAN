@@ -5,7 +5,7 @@ import util
 def first_block(z):
     """
     Function that returns the first layer block
-    :param z: Latent vector placeholder of size [batch_size, 1, 1, 512]
+    :param z: Latent vector placeholder of size [batch_size, 1, 1, 128]
     :return:
     """
     # create first layer block
@@ -53,19 +53,19 @@ def final_block(inp):
     lay = util.upsample(inp)
 
     # create sub-layer and feed the upscaled block
-    lay = util.conv_lay(lay, filter_size=[3, 3], num_filters=1024, scope="G/1024x1024/lay_0", collection="GEN_VAR")
+    lay = util.conv_lay(lay, filter_size=[3, 3], num_filters=4, scope="G/128x128/lay_0", collection="GEN_VAR")
 
     # activation function
     lay = tf.nn.relu(lay)
 
     # next sub-layer
-    lay = util.conv_lay(lay, filter_size=[3, 3], num_filters=1024, scope="G/1024x1024/lay_1", collection="GEN_VAR")
+    lay = util.conv_lay(lay, filter_size=[3, 3], num_filters=4, scope="G/128x128/lay_1", collection="GEN_VAR")
 
     # activation function
     lay = tf.nn.relu(lay)
 
     # next sub-layer
-    lay = util.conv_lay(lay, filter_size=[1, 1], num_filters=3, scope="G/1024x1024/lay_2", collection="GEN_VAR")
+    lay = util.conv_lay(lay, filter_size=[1, 1], num_filters=3, scope="G/128x128/lay_2", collection="GEN_VAR")
 
     return lay
 
@@ -73,16 +73,16 @@ def final_block(inp):
 def make(z):
     """
     Function that returns the generator network
-    :param z: Placeholder for laten vector of shape [batch_size, 1, 1, 512]
+    :param z: Placeholder for laten vector of shape [batch_size, 1, 1, 128]
     :return: The constructed generator network
     """
     # Create the first block for the network
     block = first_block(z)
 
     # Create the other blocks for the generator
-    for i in range(7):
-        num_filters = 128 if i < 3 else 2 * 2**(8 - i)
-        block = layer_block(block, num_filters, "G/{k}x{k}".format(k=4 * 2**(i+1)))
+    for i in range(1, 5):
+        num_filters = 128 if i < 4 else 64
+        block = layer_block(block, num_filters, "G/{k}x{k}".format(k=4 * 2**i))
 
     # Create the final block for the generator
     block = final_block(block)

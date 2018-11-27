@@ -9,9 +9,9 @@ def first_block(inp):
     :return:
     """
     # create first layer block
-    lay = util.conv_lay(inp, filter_size=[1, 1], num_filters=4, scope="D/1024x1024/lay_0", collection="DISCR_VAR")
-    lay = util.conv_lay(lay, filter_size=[3, 3], num_filters=8, scope="D/1024x1024/lay_1", collection="DISCR_VAR")
-    lay = util.conv_lay(lay, filter_size=[3, 3], num_filters=8, scope="D/1024x1024/lay_2", collection="DISCR_VAR")
+    lay = util.conv_lay(inp, filter_size=[1, 1], num_filters=4, scope="D/4x4/lay_0", collection="DISCR_VAR")
+    lay = util.conv_lay(lay, filter_size=[3, 3], num_filters=4, scope="D/4x4/lay_1", collection="DISCR_VAR")
+    lay = util.conv_lay(lay, filter_size=[3, 3], num_filters=8, scope="D/4x4/lay_2", collection="DISCR_VAR")
     lay = util.downsample(lay)
 
     return lay
@@ -52,19 +52,19 @@ def final_block(inp):
     :return:
     """
     # create sub-layer and feed the upscaled block
-    lay = util.conv_lay(inp, filter_size=[3, 3], num_filters=128, scope="D/4x4/lay_0", collection="DISCR_VAR")
+    lay = util.conv_lay(inp, filter_size=[3, 3], num_filters=128, scope="D/128x128/lay_0", collection="DISCR_VAR")
 
     # activation function
     lay = tf.nn.relu(lay)
 
     # next sub-layer
-    lay = util.conv_lay(lay, filter_size=[4, 4], num_filters=128, scope="D/4x4/lay_1", collection="DISCR_VAR")
+    lay = util.conv_lay(lay, filter_size=[4, 4], num_filters=128, scope="D/128x128/lay_1", collection="DISCR_VAR")
 
     # activation function
     lay = tf.nn.relu(lay)
 
     # fully-connected layer
-    lay = util.dense_lay(lay, "D/4x4/dense", collection="DISCR_VAR")
+    lay = util.dense_lay(lay, "D/128x128/dense", collection="DISCR_VAR")
 
     return lay
 
@@ -79,9 +79,9 @@ def make(inp):
     block = first_block(inp)
 
     # Create the other blocks for the discriminator
-    for i in reversed(range(7)):
-        num_filters = 128 if i < 4 else 2 * 2**(8 - i)
-        block = layer_block(block, num_filters, "D/{k}x{k}".format(k=4 * 2**(i+1)))
+    for i in reversed(range(1, 5)):
+        num_filters = 128
+        block = layer_block(block, num_filters, "D/{k}x{k}".format(k=4 * 2**i))
 
     # Create the final block for the generator
     block = final_block(block)

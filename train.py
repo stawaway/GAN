@@ -17,8 +17,8 @@ def train(img):
     """
     Define placeholders to feed the data
     """
-    real = tf.placeholder(dtype=tf.float32, shape=[batch_size, 1024, 1024, 3], name="data")
-    fake = tf.placeholder(dtype=tf.float32, shape=[batch_size, 1, 1, 512], name="latent")
+    real = tf.placeholder(dtype=tf.float32, shape=[None, 128, 128, 3], name="data")
+    fake = tf.placeholder(dtype=tf.float32, shape=[None, 1, 1, 128], name="latent")
 
     """
     Create first blocks for both the generator and the discriminator networks and train
@@ -44,6 +44,11 @@ def train(img):
     train_d = util.opt("D/Adam").minimize(d_loss_op, var_list=tf.get_collection("DISCR_VAR"))
 
     """
+    Create saver to store the trained weights
+    """
+    saver = tf.train.Saver()
+
+    """
     Set up input for training
     """
 
@@ -54,30 +59,37 @@ def train(img):
     discr_loss = np.inf
     with tf.Session() as sess:
         # initialize the GAN
-        sess.run(tf.variables_initializer(tf.trainable_variables()))
+        sess.run(tf.variables_initializer(tf.global_variables()))
 
+        step = 1
         while True:
             for i in np.arange(np.ceil(img.shape[0] / batch_size), dtype=np.int32):
                 min_ = batch_size * i
-                max_ = np.maximum(min_ + batch_size, img.shape[0])
+                max_ = np.minimum(min_ + batch_size, img.shape[0])
 
                 batch = img[min_:max_, :, :, :]
 
                 # generate images
-                gen_img = np.random.normal(loc=0., scale=1., size=[batch_size, 1, 1, 512])
+                gen_img = np.random.normal(loc=0., scale=1., size=[batch_size, 1, 1, 128])
 
                 # train the discriminator on the fake images
-                discr_loss_ = sess.run(train_d, feed_dict={real: batch, fake: gen_img})
+                _, discr_loss_ = sess.run([train_d, d_loss_op], feed_dict={real: batch, fake: gen_img})
 
                 # train the generator to fool discriminator
-                gen_loss_ = sess.run(train_g, feed_dict={fake: gen_img})
+                _, gen_loss_ = sess.run([train_g, g_loss_op], feed_dict={fake: gen_img})
+
+                # save checkpoint every 10 steps
+                if step % 10 == 0:
+                    saver.save(sess, "model/model.ckpt", global_step=step)
 
                 if np.abs(gen_loss - gen_loss_) < 0.0001 or np.abs(discr_loss - discr_loss_) < 0.0001:
                     gen_loss, discr_loss = gen_loss_, discr_loss_
+                    saver.save(sess, "model/trained_model.ckpt")
                     break
                 else:
                     gen_loss, disct_loss = gen_loss_, discr_loss_
+                    step += 1
 
 
 if __name__ == "__main__":
-    train(np.ones([32, 1024, 1024, 3]))
+    train(np.ones([150, 128, 128, 3]))
