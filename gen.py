@@ -87,4 +87,8 @@ def make(z):
     # Create the final block for the generator
     block = final_block(block)
 
+    # put the output in the [-1, 1] range
+    min_, max_ = tf.reduce_min(block), tf.reduce_max(block)
+    block = 2. * (block - min_) / (max_ - min_) - 1.
+
     return block
