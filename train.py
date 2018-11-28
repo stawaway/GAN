@@ -3,6 +3,7 @@ import numpy as np
 import gen
 import discr
 import util
+import sys
 
 
 def train(img):
@@ -46,11 +47,7 @@ def train(img):
     """
     Create saver to store the trained weights
     """
-    saver = tf.train.Saver()
-
-    """
-    Set up input for training
-    """
+    saver = tf.train.Saver(tf.get_collection("GEN_VAR"))
 
     """
     Train the network
@@ -63,6 +60,8 @@ def train(img):
 
         step = 1
         while True:
+            g_batch_loss = np.empty([0, ])
+            d_batch_loss = np.empty([0, ])
             for i in np.arange(np.ceil(img.shape[0] / batch_size), dtype=np.int32):
                 min_ = batch_size * i
                 max_ = np.minimum(min_ + batch_size, img.shape[0])
@@ -78,18 +77,29 @@ def train(img):
                 # train the generator to fool discriminator
                 _, gen_loss_ = sess.run([train_g, g_loss_op], feed_dict={fake: gen_img})
 
-                # save checkpoint every 10 steps
-                if step % 10 == 0:
-                    saver.save(sess, "model/model.ckpt", global_step=step)
+                g_batch_loss = np.append(g_batch_loss, gen_loss_)
+                d_batch_loss = np.append(d_batch_loss, discr_loss_)
 
-                if np.abs(gen_loss - gen_loss_) < 0.0001 or np.abs(discr_loss - discr_loss_) < 0.0001:
-                    gen_loss, discr_loss = gen_loss_, discr_loss_
-                    saver.save(sess, "model/trained_model.ckpt")
-                    break
-                else:
-                    gen_loss, disct_loss = gen_loss_, discr_loss_
-                    step += 1
+            print("Step ", step)
+            print("Generator loss is: ", np.mean(g_batch_loss))
+            print("Discriminator loss is: ", np.mean(d_batch_loss), "\n")
+
+            # save checkpoint every 10 steps and print to terminal
+            if step % 10 == 0:
+                saver.save(sess, "model/model.ckpt", global_step=step)
+
+            if np.abs(gen_loss - np.mean(g_batch_loss)) < 0.0001:
+                gen_loss, discr_loss = np.mean(g_batch_loss), np.mean(d_batch_loss)
+                saver.save(sess, "model/trained_model.ckpt")
+                break
+            else:
+                gen_loss, discr_loss = np.mean(g_batch_loss), np.mean(d_batch_loss)
+                step += 1
 
 
 if __name__ == "__main__":
-    train(np.ones([150, 128, 128, 3]))
+    args = sys.argv
+    # Set up input for training
+    data = util.load_img(args[1], [128, 128])
+    data = (data - 127.5) / 127.5
+    train(data)

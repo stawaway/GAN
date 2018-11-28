@@ -1,4 +1,39 @@
 import tensorflow as tf
+from PIL import Image
+import numpy as np
+import os
+
+
+def load_img(path, size):
+    """
+    Function that loads all images found in path
+    :param path:
+    :param size: size of the input images as a tuple (h, w)
+    :return: All the images as an array of size [n, h, w, 3]
+    """
+    # empty array that will contain all the images
+    h, w = size
+    img = np.empty(shape=[0, h, w, 3], dtype=np.float32)
+    for file in os.listdir(path)[:100]:
+        if file.split(".")[-1] == "jpg":
+            array = np.asarray(Image.open(os.path.join(path, file)))
+            img = np.append(img, [array], axis=0)
+
+    return img
+
+
+def save_img(x, path):
+    """
+    Function that saves all images found in path
+    :param: the images to save as an array of shape [n, h, w, 3]
+    :param path: Path where to save the batch of images
+    :return:
+    """
+    i = 0
+    for el in x:
+        im = Image.fromarray(el.astype("uint8"), "RGB")
+        im.save(path+"/{}.jpg".format(i))
+        i += 1
 
 
 def upsample(x):
@@ -42,7 +77,7 @@ def conv_lay(x, filter_size, num_filters, scope, collection):
     with tf.variable_scope(scope, reuse=tf.AUTO_REUSE):
         h, w, in_ch = x.shape[1:]
 
-        init = tf.random_normal_initializer()
+        init = tf.random_normal_initializer(stddev=0.1)
 
         w = tf.get_variable(name="w", shape=filter_size+[in_ch, num_filters],
                             dtype=tf.float32, initializer=init, trainable=True)
