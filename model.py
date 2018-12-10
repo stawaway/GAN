@@ -34,13 +34,13 @@ def main(path):
     """
     with tf.Session() as sess:
         # load trained variables for model
-        saver.restore(sess, "model/trained_model.ckpt")
+        saver.restore(sess, "model/model.ckpt-10")
 
         # generate images
         latent = np.random.normal(loc=0., scale=1., size=[batch_size, 1, 1, 128])
 
         gen_img = sess.run(g, feed_dict={fake: latent})
-        gen_img = 127.5 * gen_img + 127.5
+        gen_img = (127.5 * gen_img) + 127.5
 
         util.save_img(gen_img, path)
 

@@ -13,7 +13,7 @@ def train(img):
     :return:
     """
     # define the batch size
-    batch_size = 32
+    batch_size = 100
 
     """
     Define placeholders to feed the data
@@ -32,23 +32,28 @@ def train(img):
     Create the loss function
     """
     with tf.variable_scope("D_Loss"):
-        d_loss_op = tf.reduce_mean(d_real) - tf.reduce_mean(d_fake)
+        d_loss_op = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(
+            labels=tf.ones_like(d_real),
+            logits=d_real)
+        ) + \
+                    tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(
+                        labels=tf.zeros_like(d_fake),
+                        logits=d_fake))
 
     with tf.variable_scope("G_Loss"):
-        g_loss_op = -tf.reduce_mean(d_fake)
+        g_loss_op = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(
+            labels=tf.ones_like(d_fake),
+            logits=d_fake))
 
     """
-    Create the optimizers that will minimize the loss function for D and maximize it for G
+    Create the optimizers that will minimize the loss function for D and G
     """
     with tf.variable_scope("G/RMS"):
-        train_g = tf.train.RMSPropOptimizer(5e-5).minimize(g_loss_op)
+        train_g = tf.train.RMSPropOptimizer(1e-3).minimize(g_loss_op,
+                                                           var_list=tf.get_collection("GEN_VAR"))
     with tf.variable_scope("D/RMS"):
-        train_d = tf.train.RMSPropOptimizer(5e-5).minimize(-d_loss_op)
-
-    """
-    Create the clip variables op
-    """
-    clip_d = [var.assign(tf.clip_by_value(var, -0.01, 0.01)) for var in tf.get_collection("DISCR_VAR")]
+        train_d = tf.train.RMSPropOptimizer(1e-3).minimize(d_loss_op,
+                                                           var_list=tf.get_collection("DISCR_VAR"))
 
     """
     Create saver to store the trained weights
@@ -78,7 +83,7 @@ def train(img):
                 gen_img = np.random.normal(loc=0., scale=1., size=[batch_size, 1, 1, 128])
 
                 # train the discriminator on the fake images
-                _, _, discr_loss_ = sess.run([train_d, clip_d, d_loss_op], feed_dict={real: batch, fake: gen_img})
+                _, discr_loss_ = sess.run([train_d, d_loss_op], feed_dict={real: batch, fake: gen_img})
 
                 # train the generator to fool discriminator
                 _, gen_loss_ = sess.run([train_g, g_loss_op], feed_dict={fake: gen_img})
@@ -94,7 +99,7 @@ def train(img):
             if step % 10 == 0:
                 saver.save(sess, "model/model.ckpt", global_step=step)
 
-            if step > 200:# np.abs(gen_loss - np.mean(g_batch_loss)) < 0.0001:
+            if step > 1000:# np.abs(gen_loss - np.mean(g_batch_loss)) < 0.0001:
                 gen_loss, discr_loss = np.mean(g_batch_loss), np.mean(d_batch_loss)
                 saver.save(sess, "model/trained_model.ckpt")
                 break

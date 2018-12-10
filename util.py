@@ -16,7 +16,23 @@ def load_img(path, size):
     img = np.empty(shape=[0, h, w, 3], dtype=np.float32)
     for file in os.listdir(path)[:100]:
         if file.split(".")[-1] == "jpg":
-            array = np.asarray(Image.open(os.path.join(path, file)))
+            image = Image.open(os.path.join(path, file))
+
+            array = None
+
+            if image.size != (w, h):
+                face_width = face_height = 128
+                j = (image.size[0] - face_width) // 2
+                i = (image.size[1] - face_height) // 2
+                image = image.crop([j, i, j + face_width, i + face_height])
+                image = image.resize([w, h], Image.BILINEAR)
+                # array = np.array(image.convert("RGB"))
+                array = np.array(image)
+                array = (array - 127.5) / 127.5
+            else:
+                array = np.array(image)
+                array = (array - 127.5) / 127.5
+
             img = np.append(img, [array], axis=0)
 
     return img
@@ -147,3 +163,16 @@ def loss(logits, labels, name):
         loss = tf.reduce_mean(loss)
 
     return loss
+
+
+def pixel_normalization(x):
+    """
+    Perform pixel normalization on the input layer
+    :param x: Input layer of shape [batch_size, h, w, in_ch]
+    :return: Normalized layer of the same shape
+    """
+    num_filters = x.shape[-1]
+
+    norm = tf.sqrt(tf.reduce_mean(tf.square(x), axis=3, keepdims=True) + 1e-8)
+
+    return x / norm

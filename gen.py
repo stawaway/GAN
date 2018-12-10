@@ -14,6 +14,9 @@ def first_block(z):
     lay = util.conv_lay(lay, filter_size=[4, 4], num_filters=128, scope="G/4x4/lay_0", collection="GEN_VAR")
     lay = util.conv_lay(lay, filter_size=[3, 3], num_filters=128, scope="G/4x4/lay_1", collection="GEN_VAR")
 
+    # normalization
+    lay = util.pixel_normalization(lay)
+
     return lay
 
 
@@ -32,13 +35,16 @@ def layer_block(inp, num_filters, name):
     lay = util.conv_lay(lay, filter_size=[3, 3], num_filters=num_filters, scope=name+"/lay_0", collection="GEN_VAR")
 
     # activation function
-    lay = tf.nn.relu(lay)
+    lay = tf.nn.leaky_relu(lay)
 
     # next sub-layer
     lay = util.conv_lay(lay, filter_size=[3, 3], num_filters=num_filters, scope=name+"/lay_1", collection="GEN_VAR")
 
     # activation function
-    lay = tf.nn.relu(lay)
+    lay = tf.nn.leaky_relu(lay)
+
+    # normalization
+    lay = util.pixel_normalization(lay)
 
     return lay
 
@@ -56,16 +62,22 @@ def final_block(inp):
     lay = util.conv_lay(lay, filter_size=[3, 3], num_filters=4, scope="G/128x128/lay_0", collection="GEN_VAR")
 
     # activation function
-    lay = tf.nn.relu(lay)
+    lay = tf.nn.leaky_relu(lay)
 
     # next sub-layer
     lay = util.conv_lay(lay, filter_size=[3, 3], num_filters=4, scope="G/128x128/lay_1", collection="GEN_VAR")
 
+    # normalization
+    lay = util.pixel_normalization(lay)
+
     # activation function
-    lay = tf.nn.relu(lay)
+    lay = tf.nn.leaky_relu(lay)
 
     # next sub-layer
     lay = util.conv_lay(lay, filter_size=[1, 1], num_filters=3, scope="G/128x128/lay_2", collection="GEN_VAR")
+
+    # put images in the range [-1, 1]
+    lay = tf.nn.tanh(lay)
 
     return lay
 
@@ -86,9 +98,5 @@ def make(z):
 
     # Create the final block for the generator
     block = final_block(block)
-
-    # put the output in the [-1, 1] range
-    min_, max_ = tf.reduce_min(block), tf.reduce_max(block)
-    block = 2. * (block - min_) / (max_ - min_) - 1.
 
     return block
