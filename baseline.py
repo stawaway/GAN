@@ -8,6 +8,7 @@ FLAGS = tf.flags.FLAGS
 tf.flags.DEFINE_integer("batch_size", 100, "Defines the number of images per mini-batch")
 tf.flags.DEFINE_bool("train", True, "Whether the network is trained or not")
 tf.flags.DEFINE_string("img_path", "/tmp/celeba-128", "The path where to look for the images")
+tf.flags.DEFINE_float("eps", float(np.finfo(np.float32).tiny), "Small number for batch_normalization")
 
 
 def generator(inp):
@@ -22,22 +23,22 @@ def generator(inp):
 
         # define the first convolution layer 4x4
         lay = tf.layers.conv2d_transpose(inp, 512, 4, name="layer_1")
-        lay = tf.nn.batch_normalization(lay, 0., 1.)
+        lay = tf.nn.batch_normalization(lay, 0., 1., None, None, variance_epsilon=FLAGS.eps)
         lay = tf.nn.sigmoid(lay)
 
         # define the second layer 8x8
         lay = tf.layers.conv2d_transpose(lay, 256, 4, strides=2, padding="SAME", name="layer_2")
-        lay = tf.nn.batch_normalization(lay, 0., 1.)
+        lay = tf.nn.batch_normalization(lay, 0., 1., None, None, variance_epsilon=FLAGS.eps)
         lay = tf.nn.sigmoid(lay)
 
         # define the first layer 16x16
         lay = tf.layers.conv2d_transpose(lay, 128, 4, strides=2, padding="SAME", name="layer_3")
-        lay = tf.nn.batch_normalization(lay, 0., 1.)
+        lay = tf.nn.batch_normalization(lay, 0., 1., None, None, variance_epsilon=FLAGS.eps)
         lay = tf.nn.sigmoid(lay)
 
         # define the second layer 32x32
         lay = tf.layers.conv2d_transpose(lay, 3, 4, strides=2, padding="SAME", name="layer_4")
-        lay = tf.nn.batch_normalization(lay, 0., 1.)
+        lay = tf.nn.batch_normalization(lay, 0., 1., None, None, variance_epsilon=FLAGS.eps)
         lay = tf.nn.tanh(lay)
 
     return lay
@@ -54,22 +55,22 @@ def discriminator(inp, reuse):
 
         # define the second layer 16x16
         lay = tf.layers.conv2d(inp, 64, 4, strides=2, padding="SAME", name="layer_0")
-        lay = tf.nn.batch_normalization(lay, 0., 1.)
+        lay = tf.nn.batch_normalization(lay, 0., 1., None, None, variance_epsilon=FLAGS.eps)
         lay = tf.nn.sigmoid(lay)
 
         # define the third layer 8x8
         lay = tf.layers.conv2d(lay, 128, 4, strides=2, padding="SAME", name="layer_1")
-        lay = tf.nn.batch_normalization(lay, 0., 1.)
+        lay = tf.nn.batch_normalization(lay, 0., 1., None, None, variance_epsilon=FLAGS.eps)
         lay = tf.nn.sigmoid(lay)
 
         # define the third layer 4x4
         lay = tf.layers.conv2d(lay, 256, 4, strides=2, padding="SAME", name="layer_2")
-        lay = tf.nn.batch_normalization(lay, 0., 1.)
+        lay = tf.nn.batch_normalization(lay, 0., 1., None, None, variance_epsilon=FLAGS.eps)
         lay = tf.nn.sigmoid(lay)
 
         # define the first fully-connected layer
         lay = tf.layers.dense(inp, 1, "sigmoid", name="layer_3")
-        lay = tf.nn.batch_normalization(lay, 0., 1.)
+        lay = tf.nn.batch_normalization(lay, 0., 1., None, None, variance_epsilon=FLAGS.eps)
         lay = tf.squeeze(lay)
 
     return lay
@@ -94,7 +95,7 @@ def model(latent, real):
     d_loss_real = tf.nn.sigmoid_cross_entropy_with_logits(labels=tf.ones_like(d_real), logits=d_real)
     d_loss_real = tf.reduce_mean(d_loss_real)
     d_loss_fake = tf.nn.sigmoid_cross_entropy_with_logits(labels=tf.zeros_like(d_fake), logits=d_fake)
-    d_loss_fake = tf.reduce_sum(d_loss_fake)
+    d_loss_fake = tf.reduce_mean(d_loss_fake)
 
     return g_loss, d_loss_real + d_loss_fake
 
@@ -110,8 +111,8 @@ def train():
     g_loss_op, d_loss_op = model(fake, real)
 
     # Optimizers for the generator and the discriminator
-    train_g = tf.train.RMSPropOptimizer(5e-5).minimize(g_loss_op)
-    train_d = tf.train.RMSPropOptimizer(5e-5).minimize(d_loss_op)
+    train_g = tf.train.RMSPropOptimizer(5e-3).minimize(g_loss_op)
+    train_d = tf.train.RMSPropOptimizer(5e-3).minimize(d_loss_op)
 
     # add summary scalars
     tf.summary.scalar("discriminator loss", d_loss_op)
@@ -167,7 +168,7 @@ def train():
                 writer.add_summary(summary, step)
                 g_saver.save(sess, "model/model.ckpt", global_step=step - 1)
 
-            if step > 400:  # np.abs(gen_loss - np.mean(g_batch_loss)) < 0.0001:
+            if step > 1000:  # np.abs(gen_loss - np.mean(g_batch_loss)) < 0.0001:
                 gen_loss, discr_loss = np.mean(g_batch_loss), np.mean(d_batch_loss)
                 g_saver.save(sess, "model/g_weights.ckpt")
                 d_saver.save(sess, "model/d_weights.ckpt")
