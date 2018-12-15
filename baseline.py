@@ -1,6 +1,7 @@
 import numpy as np
 import tensorflow as tf
 import util
+from PIL import Image
 
 
 FLAGS = tf.flags.FLAGS
@@ -145,6 +146,11 @@ def train():
 
                 # generate images
                 gen_img = np.random.normal(loc=0., scale=1., size=[FLAGS.batch_size, 1, 1, 128])
+
+                # output test images every 50 step
+                if step % 50:
+                    for image in gen_img[:4]:
+                        Image.fromarray(image).show()
 
                 # train the discriminator on the fake images
                 _, discr_loss_ = sess.run([train_d, d_loss_op], feed_dict={real: batch, fake: gen_img})
