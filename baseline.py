@@ -6,7 +6,7 @@ import argparse
 
 parser = argparse.ArgumentParser()
 
-batch_size = 10
+batch_size = 100
 training = True
 img_path = "/Users/williamst-arnaud/U de M/IFT6269/celeba-128"
 eps = float(np.finfo(np.float32).tiny)
@@ -26,21 +26,25 @@ def generator(inp):
         # define the first convolution layer 4x4
         lay = tf.layers.conv2d_transpose(lay, 512, 4, name="layer_1")
         lay = tf.nn.batch_normalization(lay, 0., 1., None, None, variance_epsilon=eps)
-        lay = tf.nn.sigmoid(lay)
+        lay = tf.nn.dropout(lay, 0.5)
+        lay = tf.nn.relu(lay)
 
         # define the second layer 8x8
         lay = tf.layers.conv2d_transpose(lay, 256, 4, strides=2, padding="SAME", name="layer_2")
         lay = tf.nn.batch_normalization(lay, 0., 1., None, None, variance_epsilon=eps)
-        lay = tf.nn.sigmoid(lay)
+        lay = tf.nn.dropout(lay, 0.5)
+        lay = tf.nn.relu(lay)
 
         # define the first layer 16x16
         lay = tf.layers.conv2d_transpose(lay, 128, 4, strides=2, padding="SAME", name="layer_3")
         lay = tf.nn.batch_normalization(lay, 0., 1., None, None, variance_epsilon=eps)
-        lay = tf.nn.sigmoid(lay)
+        lay = tf.nn.dropout(lay, 0.5)
+        lay = tf.nn.relu(lay)
 
         # define the second layer 32x32
         lay = tf.layers.conv2d_transpose(lay, 3, 4, strides=2, padding="SAME", name="layer_4")
         lay = tf.nn.batch_normalization(lay, 0., 1., None, None, variance_epsilon=eps)
+        lay = tf.nn.dropout(lay, 0.5)
         lay = tf.nn.tanh(lay)
 
     return lay
@@ -58,21 +62,25 @@ def discriminator(inp, reuse):
         # define the second layer 16x16
         lay = tf.layers.conv2d(inp, 64, 4, strides=2, padding="SAME", name="layer_0")
         lay = tf.nn.batch_normalization(lay, 0., 1., None, None, variance_epsilon=eps)
-        lay = tf.nn.sigmoid(lay)
+        lay = tf.nn.dropout(lay, 0.5)
+        lay = tf.nn.relu(lay)
 
         # define the third layer 8x8
         lay = tf.layers.conv2d(lay, 128, 4, strides=2, padding="SAME", name="layer_1")
         lay = tf.nn.batch_normalization(lay, 0., 1., None, None, variance_epsilon=eps)
-        lay = tf.nn.sigmoid(lay)
+        lay = tf.nn.dropout(lay, 0.5)
+        lay = tf.nn.relu(lay)
 
         # define the third layer 4x4
         lay = tf.layers.conv2d(lay, 256, 4, strides=2, padding="SAME", name="layer_2")
         lay = tf.nn.batch_normalization(lay, 0., 1., None, None, variance_epsilon=eps)
-        lay = tf.nn.sigmoid(lay)
+        lay = tf.nn.dropout(lay, 0.5)
+        lay = tf.nn.relu(lay)
 
         # define the first fully-connected layer
         lay = tf.layers.dense(lay, 1, "sigmoid", name="layer_3")
         lay = tf.nn.batch_normalization(lay, 0., 1., None, None, variance_epsilon=eps)
+        lay = tf.nn.dropout(lay, 0.5)
         lay = tf.squeeze(lay)
 
     return lay
