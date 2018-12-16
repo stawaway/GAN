@@ -6,7 +6,7 @@ import argparse
 
 parser = argparse.ArgumentParser()
 
-batch_size = 100
+batch_size = 10
 training = True
 img_path = "/Users/williamst-arnaud/U de M/IFT6269/celeba-128"
 eps = float(np.finfo(np.float32).tiny)
@@ -24,7 +24,7 @@ def generator(inp):
         lay = tf.layers.dense(inp, 1024, "sigmoid", name="layer_0")
 
         # define the first convolution layer 4x4
-        lay = tf.layers.conv2d_transpose(inp, 512, 4, name="layer_1")
+        lay = tf.layers.conv2d_transpose(lay, 512, 4, name="layer_1")
         lay = tf.nn.batch_normalization(lay, 0., 1., None, None, variance_epsilon=eps)
         lay = tf.nn.sigmoid(lay)
 
@@ -115,8 +115,8 @@ def train(g_weights=None, d_weights=None):
     g, g_loss_op, d_loss_op = model(fake, real)
 
     # Optimizers for the generator and the discriminator
-    train_g = tf.train.RMSPropOptimizer(5e-3).minimize(g_loss_op)
-    train_d = tf.train.RMSPropOptimizer(5e-3).minimize(d_loss_op)
+    train_g = tf.train.RMSPropOptimizer(5e-5).minimize(g_loss_op)
+    train_d = tf.train.RMSPropOptimizer(5e-5).minimize(d_loss_op)
 
     # add summary scalars
     tf.summary.scalar("discriminator loss", d_loss_op)
@@ -138,6 +138,7 @@ def train(g_weights=None, d_weights=None):
         sess.run(tf.variables_initializer(tf.global_variables()))
         if g_weights is not None:
             g_saver.restore(sess, g_weights)
+        if d_weights is not None:
             d_saver.restore(sess, d_weights)
 
         step = 1
