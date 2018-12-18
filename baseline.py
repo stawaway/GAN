@@ -98,7 +98,7 @@ def model(latent, real):
     g_loss = tf.reduce_mean(g_loss)
 
     # define the discriminator loss
-    d_loss_real = tf.nn.sigmoid_cross_entropy_with_logits(labels=tf.ones_like(d_real), logits=d_real)
+    d_loss_real = tf.nn.sigmoid_cross_entropy_with_logits(labels=tf.ones_like(d_real) * 0.9, logits=d_real)
     d_loss_real = tf.reduce_mean(d_loss_real)
     d_loss_fake = tf.nn.sigmoid_cross_entropy_with_logits(labels=tf.zeros_like(d_fake), logits=d_fake)
     d_loss_fake = tf.reduce_mean(d_loss_fake)
