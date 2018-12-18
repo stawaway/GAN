@@ -61,8 +61,8 @@ def discriminator(inp, reuse):
     with tf.variable_scope("discriminator", reuse=reuse):
 
         # define the second layer 16x16
-        lay = tf.layers.conv2d(inp, 32, 4, strides=2, padding="SAME", name="layer_0")
-        lay = tf.layers.conv2d(inp, 32, 4, strides=1, padding="SAME", name="layer_1")
+        lay = tf.layers.conv2d(inp, 64, 4, strides=2, padding="SAME", name="layer_0")
+        lay = tf.layers.conv2d(lay, 64, 4, strides=1, padding="SAME", name="layer_1")
         lay = tf.layers.batch_normalization(lay, training=True)
         lay = tf.nn.relu(lay)
         lay = tf.nn.dropout(lay, 0.5)
@@ -110,6 +110,9 @@ def model(latent, real):
 
     d_loss_fake = tf.nn.sigmoid_cross_entropy_with_logits(labels=tf.zeros_like(d_fake), logits=d_fake)
     d_loss_fake = tf.reduce_mean(d_loss_fake)
+    #d_loss_fake = tf.nn.sigmoid_cross_entropy_with_logits(labels=tf.ones_like(d_fake), logits=d_fake)
+    #d_loss_fake = tf.reduce_mean(-d_loss_fake)
+
 
     return g, g_loss, d_loss_real + d_loss_fake
 
@@ -127,8 +130,12 @@ def train(g_weights=None, d_weights=None):
     g, g_loss_op, d_loss_op = model(fake, real)
 
     # Optimizers for the generator and the discriminator
-    train_g = tf.train.RMSPropOptimizer(5e-5).minimize(g_loss_op)
-    train_d = tf.train.RMSPropOptimizer(5e-5).minimize(d_loss_op)
+    train_g = tf.train.AdamOptimizer(7e-5).minimize(g_loss_op,
+                                                    var_list=tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES,
+                                                                               scope="generator"))
+    train_d = tf.train.AdamOptimizer(7e-5).minimize(d_loss_op,
+                                                    var_list=tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES,
+                                                                               scope="discriminator"))
 
     # add summary scalars
     tf.summary.scalar("discriminator loss", d_loss_op)
