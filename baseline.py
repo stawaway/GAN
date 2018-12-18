@@ -8,7 +8,8 @@ parser = argparse.ArgumentParser()
 
 batch_size = 100
 training = True
-img_path = "/Users/williamst-arnaud/U de M/IFT6269/celeba-128"
+img_path = "../celeba-128"
+save_path = "baseline_imgs"
 eps = float(np.finfo(np.float32).tiny)
 restore_path = None
 
@@ -192,10 +193,14 @@ def train(g_weights=None, d_weights=None):
                 writer.add_summary(summary, step)
                 g_saver.save(sess, "model/model.ckpt", global_step=step - 1)
 
-            if step > 1000:  # np.abs(gen_loss - np.mean(g_batch_loss)) < 0.0001:
+            if step > 2000:  # np.abs(gen_loss - np.mean(g_batch_loss)) < 0.0001:
                 gen_loss, discr_loss = np.mean(g_batch_loss), np.mean(d_batch_loss)
                 g_saver.save(sess, "model/g_weights.ckpt")
                 d_saver.save(sess, "model/d_weights.ckpt")
+                latent = np.random.normal(0., 1. , size=[batch_size, 1, 1, 128])
+                images = sess.run(g ,feed_dict={fake: latent})
+                util.save_img((127.5 * images) + 127.5, save_path)
+
                 break
             else:
                 gen_loss, discr_loss = np.mean(g_batch_loss), np.mean(d_batch_loss)
