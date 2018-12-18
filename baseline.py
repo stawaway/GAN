@@ -26,26 +26,26 @@ def generator(inp):
         # define the first convolution layer 4x4
         lay = tf.layers.conv2d_transpose(lay, 512, 4, name="layer_1")
         lay = tf.nn.batch_normalization(lay, 0., 1., None, None, variance_epsilon=eps)
+        lay = tf.nn.leaky_relu(lay)
         lay = tf.nn.dropout(lay, 0.5)
-        lay = tf.nn.relu(lay)
 
         # define the second layer 8x8
         lay = tf.layers.conv2d_transpose(lay, 256, 4, strides=2, padding="SAME", name="layer_2")
         lay = tf.nn.batch_normalization(lay, 0., 1., None, None, variance_epsilon=eps)
+        lay = tf.nn.leaky_relu(lay)
         lay = tf.nn.dropout(lay, 0.5)
-        lay = tf.nn.relu(lay)
 
         # define the first layer 16x16
         lay = tf.layers.conv2d_transpose(lay, 128, 4, strides=2, padding="SAME", name="layer_3")
         lay = tf.nn.batch_normalization(lay, 0., 1., None, None, variance_epsilon=eps)
+        lay = tf.nn.leaky_relu(lay)
         lay = tf.nn.dropout(lay, 0.5)
-        lay = tf.nn.relu(lay)
 
         # define the second layer 32x32
         lay = tf.layers.conv2d_transpose(lay, 3, 4, strides=2, padding="SAME", name="layer_4")
         lay = tf.nn.batch_normalization(lay, 0., 1., None, None, variance_epsilon=eps)
-        lay = tf.nn.dropout(lay, 0.5)
         lay = tf.nn.tanh(lay)
+        lay = tf.nn.dropout(lay, 0.5)
 
     return lay
 
@@ -62,20 +62,20 @@ def discriminator(inp, reuse):
         # define the second layer 16x16
         lay = tf.layers.conv2d(inp, 128, 4, strides=2, padding="SAME", name="layer_0")
         lay = tf.nn.batch_normalization(lay, 0., 1., None, None, variance_epsilon=eps)
+        lay = tf.nn.leaky_relu(lay)
         lay = tf.nn.dropout(lay, 0.5)
-        lay = tf.nn.relu(lay)
 
         # define the third layer 8x8
         lay = tf.layers.conv2d(lay, 128, 4, strides=2, padding="SAME", name="layer_1")
         lay = tf.nn.batch_normalization(lay, 0., 1., None, None, variance_epsilon=eps)
+        lay = tf.nn.leaky_relu(lay)
         lay = tf.nn.dropout(lay, 0.5)
-        lay = tf.nn.relu(lay)
 
         # define the third layer 4x4
         lay = tf.layers.conv2d(lay, 256, 4, strides=2, padding="SAME", name="layer_2")
         lay = tf.nn.batch_normalization(lay, 0., 1., None, None, variance_epsilon=eps)
+        lay = tf.nn.leaky_relu(lay)
         lay = tf.nn.dropout(lay, 0.5)
-        lay = tf.nn.relu(lay)
 
         # define the first fully-connected layer
         lay = tf.reshape(lay, [-1, 4*4*256])
