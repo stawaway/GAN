@@ -24,19 +24,21 @@ def generator(inp):
         lay = tf.layers.dense(inp, 16*1024, name="layer_0")
         lay = tf.reshape(lay, [-1, 4, 4, 1024])
         lay = tf.layers.batch_normalization(lay, training=True)
-        lay = tf.nn.leaky_relu(lay)
+        lay = tf.nn.relu(lay)
         lay = tf.nn.dropout(lay, 0.5)
 
         # define the first convolution layer 8x8
         lay = tf.layers.conv2d_transpose(lay, 512, 4, strides=2, name="layer_1", padding="SAME")
+        lay = tf.layers.conv2d_transpose(lay, 512, 4, strides=1, name="layer_1", padding="SAME")
         lay = tf.layers.batch_normalization(lay, training=True)
-        lay = tf.nn.leaky_relu(lay)
+        lay = tf.nn.relu(lay)
         lay = tf.nn.dropout(lay, 0.5)
 
-        # define the second layer 8x8
+        # define the second layer 16x16
         lay = tf.layers.conv2d_transpose(lay, 256, 4, strides=2, padding="SAME", name="layer_2")
+        lay = tf.layers.conv2d_transpose(lay, 256, 4, strides=1, padding="SAME", name="layer_2")
         lay = tf.layers.batch_normalization(lay, training=True)
-        lay = tf.nn.leaky_relu(lay)
+        lay = tf.nn.relu(lay)
         lay = tf.nn.dropout(lay, 0.5)
 
         # define the second layer 32x32
@@ -56,22 +58,24 @@ def discriminator(inp, reuse):
     with tf.variable_scope("discriminator", reuse=reuse):
 
         # define the second layer 16x16
-        lay = tf.layers.conv2d(inp, 128, 4, strides=2, padding="SAME", name="layer_0",
-                               kernel_initializer=tf.contrib.layers.xavier_initializer())
+        lay = tf.layers.conv2d(inp, 32, 4, strides=2, padding="SAME", name="layer_0")
+        lay = tf.layers.conv2d(inp, 32, 4, strides=1, padding="SAME", name="layer_1")
         lay = tf.layers.batch_normalization(lay, training=True)
-        lay = tf.nn.leaky_relu(lay)
+        lay = tf.nn.relu(lay)
         lay = tf.nn.dropout(lay, 0.5)
 
         # define the third layer 8x8
-        lay = tf.layers.conv2d(lay, 128, 4, strides=2, padding="SAME", name="layer_1")
+        lay = tf.layers.conv2d(lay, 128, 4, strides=2, padding="SAME", name="layer_2")
+        lay = tf.layers.conv2d(lay, 128, 4, strides=1, padding="SAME", name="layer_3")
         lay = tf.layers.batch_normalization(lay, training=True)
-        lay = tf.nn.leaky_relu(lay)
+        lay = tf.nn.relu(lay)
         lay = tf.nn.dropout(lay, 0.5)
 
         # define the third layer 4x4
-        lay = tf.layers.conv2d(lay, 256, 4, strides=2, padding="SAME", name="layer_2")
+        lay = tf.layers.conv2d(lay, 256, 4, strides=2, padding="SAME", name="layer_4")
+        lay = tf.layers.conv2d(lay, 256, 4, strides=1, padding="SAME", name="layer_4")
         lay = tf.layers.batch_normalization(lay, training=True)
-        lay = tf.nn.leaky_relu(lay)
+        lay = tf.nn.relu(lay)
         lay = tf.nn.dropout(lay, 0.5)
 
         # define the first fully-connected layer
@@ -98,8 +102,9 @@ def model(latent, real):
     g_loss = tf.reduce_mean(g_loss)
 
     # define the discriminator loss
-    d_loss_real = tf.nn.sigmoid_cross_entropy_with_logits(labels=tf.ones_like(d_real) * 0.9, logits=d_real)
+    d_loss_real = tf.nn.sigmoid_cross_entropy_with_logits(labels=tf.ones_like(d_real), logits=d_real)
     d_loss_real = tf.reduce_mean(d_loss_real)
+
     d_loss_fake = tf.nn.sigmoid_cross_entropy_with_logits(labels=tf.zeros_like(d_fake), logits=d_fake)
     d_loss_fake = tf.reduce_mean(d_loss_fake)
 
@@ -119,8 +124,8 @@ def train(g_weights=None, d_weights=None):
     g, g_loss_op, d_loss_op = model(fake, real)
 
     # Optimizers for the generator and the discriminator
-    train_g = tf.train.RMSPropOptimizer(1e-3).minimize(g_loss_op)
-    train_d = tf.train.RMSPropOptimizer(1e-3).minimize(d_loss_op)
+    train_g = tf.train.RMSPropOptimizer(5e-5).minimize(g_loss_op)
+    train_d = tf.train.RMSPropOptimizer(5e-5).minimize(d_loss_op)
 
     # add summary scalars
     tf.summary.scalar("discriminator loss", d_loss_op)
@@ -165,7 +170,7 @@ def train(g_weights=None, d_weights=None):
                 _, gen_loss_ = sess.run([train_g, g_loss_op], feed_dict={fake: gen_img})
 
                 # output test images every 50 step
-                if step % 10 == 0:
+                if step % 100 == 0:
                     samples = sess.run(g, feed_dict={fake: gen_img})
                     for image in samples[:1]:
                         image = np.uint8((127.5 * image) + 127.5)
@@ -179,7 +184,7 @@ def train(g_weights=None, d_weights=None):
             print("Discriminator loss is: ", np.mean(d_batch_loss), "\n")
 
             # save checkpoint every 10 steps and print to terminal
-            if step % 10 or step == 1.:
+            if step % 100 or step == 1.:
                 summary = sess.run(merged,
                                    feed_dict={
                                        real: img,
