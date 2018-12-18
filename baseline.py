@@ -21,31 +21,27 @@ def generator(inp):
     """
     with tf.variable_scope("generator"):
         # define the first fully-connected layer
-        lay = tf.layers.dense(inp, 1024, "sigmoid", name="layer_0")
+        lay = tf.layers.dense(inp, 16*1024, name="layer_0")
+        lay = tf.reshape(lay, [-1, 4, 4, 1024])
+        lay = tf.layers.batch_normalization(lay, training=True)
+        lay = tf.nn.leaky_relu(lay)
+        lay = tf.nn.dropout(lay, 0.5)
 
-        # define the first convolution layer 4x4
-        lay = tf.layers.conv2d_transpose(lay, 512, 4, name="layer_1")
-        lay = tf.nn.batch_normalization(lay, 0., 1., None, None, variance_epsilon=eps)
+        # define the first convolution layer 8x8
+        lay = tf.layers.conv2d_transpose(lay, 512, 4, strides=2, name="layer_1", padding="SAME")
+        lay = tf.layers.batch_normalization(lay, training=True)
         lay = tf.nn.leaky_relu(lay)
         lay = tf.nn.dropout(lay, 0.5)
 
         # define the second layer 8x8
         lay = tf.layers.conv2d_transpose(lay, 256, 4, strides=2, padding="SAME", name="layer_2")
-        lay = tf.nn.batch_normalization(lay, 0., 1., None, None, variance_epsilon=eps)
-        lay = tf.nn.leaky_relu(lay)
-        lay = tf.nn.dropout(lay, 0.5)
-
-        # define the first layer 16x16
-        lay = tf.layers.conv2d_transpose(lay, 128, 4, strides=2, padding="SAME", name="layer_3")
-        lay = tf.nn.batch_normalization(lay, 0., 1., None, None, variance_epsilon=eps)
+        lay = tf.layers.batch_normalization(lay, training=True)
         lay = tf.nn.leaky_relu(lay)
         lay = tf.nn.dropout(lay, 0.5)
 
         # define the second layer 32x32
-        lay = tf.layers.conv2d_transpose(lay, 3, 4, strides=2, padding="SAME", name="layer_4")
-        lay = tf.nn.batch_normalization(lay, 0., 1., None, None, variance_epsilon=eps)
+        lay = tf.layers.conv2d_transpose(lay, 3, 4, strides=2, padding="SAME", name="layer_3")
         lay = tf.nn.tanh(lay)
-        lay = tf.nn.dropout(lay, 0.5)
 
     return lay
 
@@ -60,28 +56,27 @@ def discriminator(inp, reuse):
     with tf.variable_scope("discriminator", reuse=reuse):
 
         # define the second layer 16x16
-        lay = tf.layers.conv2d(inp, 128, 4, strides=2, padding="SAME", name="layer_0")
-        lay = tf.nn.batch_normalization(lay, 0., 1., None, None, variance_epsilon=eps)
+        lay = tf.layers.conv2d(inp, 128, 4, strides=2, padding="SAME", name="layer_0",
+                               kernel_initializer=tf.contrib.layers.xavier_initializer())
+        lay = tf.layers.batch_normalization(lay, training=True)
         lay = tf.nn.leaky_relu(lay)
         lay = tf.nn.dropout(lay, 0.5)
 
         # define the third layer 8x8
         lay = tf.layers.conv2d(lay, 128, 4, strides=2, padding="SAME", name="layer_1")
-        lay = tf.nn.batch_normalization(lay, 0., 1., None, None, variance_epsilon=eps)
+        lay = tf.layers.batch_normalization(lay, training=True)
         lay = tf.nn.leaky_relu(lay)
         lay = tf.nn.dropout(lay, 0.5)
 
         # define the third layer 4x4
         lay = tf.layers.conv2d(lay, 256, 4, strides=2, padding="SAME", name="layer_2")
-        lay = tf.nn.batch_normalization(lay, 0., 1., None, None, variance_epsilon=eps)
+        lay = tf.layers.batch_normalization(lay, training=True)
         lay = tf.nn.leaky_relu(lay)
         lay = tf.nn.dropout(lay, 0.5)
 
         # define the first fully-connected layer
         lay = tf.reshape(lay, [-1, 4*4*256])
-        lay = tf.layers.dense(lay, 1, "sigmoid", name="layer_3")
-        lay = tf.nn.batch_normalization(lay, 0., 1., None, None, variance_epsilon=eps)
-        lay = tf.nn.dropout(lay, 0.5)
+        lay = tf.layers.dense(lay, 1, name="layer_3")
         lay = tf.squeeze(lay)
 
     return lay
@@ -124,8 +119,8 @@ def train(g_weights=None, d_weights=None):
     g, g_loss_op, d_loss_op = model(fake, real)
 
     # Optimizers for the generator and the discriminator
-    train_g = tf.train.RMSPropOptimizer(5e-5).minimize(g_loss_op)
-    train_d = tf.train.RMSPropOptimizer(5e-5).minimize(d_loss_op)
+    train_g = tf.train.RMSPropOptimizer(1e-3).minimize(g_loss_op)
+    train_d = tf.train.RMSPropOptimizer(1e-3).minimize(d_loss_op)
 
     # add summary scalars
     tf.summary.scalar("discriminator loss", d_loss_op)
@@ -170,9 +165,9 @@ def train(g_weights=None, d_weights=None):
                 _, gen_loss_ = sess.run([train_g, g_loss_op], feed_dict={fake: gen_img})
 
                 # output test images every 50 step
-                if step % 50 == 0:
+                if step % 10 == 0:
                     samples = sess.run(g, feed_dict={fake: gen_img})
-                    for image in samples[:4]:
+                    for image in samples[:1]:
                         image = np.uint8((127.5 * image) + 127.5)
                         Image.fromarray(image).show()
 
