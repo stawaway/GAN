@@ -3,8 +3,10 @@ import tensorflow as tf
 import util
 from PIL import Image
 import argparse
+import sys
 
 parser = argparse.ArgumentParser()
+# parser.add_argument("--img_path")
 
 batch_size = 100
 training = True
@@ -234,5 +236,7 @@ def sample():
 
 
 if __name__ == "__main__":
+    args = sys.argv[1, 2]
+    img_path, save_path = args
     train()
 
