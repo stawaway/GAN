@@ -60,7 +60,7 @@ def discriminator(inp, reuse):
     with tf.variable_scope("discriminator", reuse=reuse):
 
         # define the second layer 16x16
-        lay = tf.layers.conv2d(inp, 64, 4, strides=2, padding="SAME", name="layer_0")
+        lay = tf.layers.conv2d(inp, 128, 4, strides=2, padding="SAME", name="layer_0")
         lay = tf.nn.batch_normalization(lay, 0., 1., None, None, variance_epsilon=eps)
         lay = tf.nn.dropout(lay, 0.5)
         lay = tf.nn.relu(lay)
@@ -78,6 +78,7 @@ def discriminator(inp, reuse):
         lay = tf.nn.relu(lay)
 
         # define the first fully-connected layer
+        lay = tf.reshape(lay, [-1, 4*4*256])
         lay = tf.layers.dense(lay, 1, "sigmoid", name="layer_3")
         lay = tf.nn.batch_normalization(lay, 0., 1., None, None, variance_epsilon=eps)
         lay = tf.nn.dropout(lay, 0.5)
