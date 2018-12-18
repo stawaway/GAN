@@ -130,12 +130,11 @@ def train(g_weights=None, d_weights=None):
     g, g_loss_op, d_loss_op = model(fake, real)
 
     # Optimizers for the generator and the discriminator
-    train_g = tf.train.AdamOptimizer(7e-5).minimize(g_loss_op,
-                                                    var_list=tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES,
-                                                                               scope="generator"))
-    train_d = tf.train.AdamOptimizer(7e-5).minimize(d_loss_op,
-                                                    var_list=tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES,
-                                                                               scope="discriminator"))
+    adam = tf.train.AdamOptimizer(7e-5)
+    train_g = adam.minimize(g_loss_op,
+                            var_list=tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope="generator"))
+    train_d = adam.minimize(d_loss_op,
+                            var_list=tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope="discriminator"))
 
     # add summary scalars
     tf.summary.scalar("discriminator loss", d_loss_op)
