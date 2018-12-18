@@ -32,20 +32,20 @@ def generator(inp):
 
         # define the first convolution layer 8x8
         lay = tf.layers.conv2d_transpose(lay, 512, 4, strides=2, name="layer_1", padding="SAME")
-        lay = tf.layers.conv2d_transpose(lay, 512, 4, strides=1, name="layer_1", padding="SAME")
+        lay = tf.layers.conv2d_transpose(lay, 512, 4, strides=1, name="layer_2", padding="SAME")
         lay = tf.layers.batch_normalization(lay, training=True)
         lay = tf.nn.relu(lay)
         lay = tf.nn.dropout(lay, 0.5)
 
         # define the second layer 16x16
-        lay = tf.layers.conv2d_transpose(lay, 256, 4, strides=2, padding="SAME", name="layer_2")
-        lay = tf.layers.conv2d_transpose(lay, 256, 4, strides=1, padding="SAME", name="layer_2")
+        lay = tf.layers.conv2d_transpose(lay, 256, 4, strides=2, padding="SAME", name="layer_3")
+        lay = tf.layers.conv2d_transpose(lay, 256, 4, strides=1, padding="SAME", name="layer_4")
         lay = tf.layers.batch_normalization(lay, training=True)
         lay = tf.nn.relu(lay)
         lay = tf.nn.dropout(lay, 0.5)
 
         # define the second layer 32x32
-        lay = tf.layers.conv2d_transpose(lay, 3, 4, strides=2, padding="SAME", name="layer_3")
+        lay = tf.layers.conv2d_transpose(lay, 3, 4, strides=2, padding="SAME", name="layer_5")
         lay = tf.nn.tanh(lay)
 
     return lay
@@ -76,14 +76,14 @@ def discriminator(inp, reuse):
 
         # define the third layer 4x4
         lay = tf.layers.conv2d(lay, 256, 4, strides=2, padding="SAME", name="layer_4")
-        lay = tf.layers.conv2d(lay, 256, 4, strides=1, padding="SAME", name="layer_4")
+        lay = tf.layers.conv2d(lay, 256, 4, strides=1, padding="SAME", name="layer_5")
         lay = tf.layers.batch_normalization(lay, training=True)
         lay = tf.nn.relu(lay)
         lay = tf.nn.dropout(lay, 0.5)
 
         # define the first fully-connected layer
         lay = tf.reshape(lay, [-1, 4*4*256])
-        lay = tf.layers.dense(lay, 1, name="layer_3")
+        lay = tf.layers.dense(lay, 1, name="layer_6")
         lay = tf.squeeze(lay)
 
     return lay
