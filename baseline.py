@@ -236,7 +236,7 @@ def sample():
 
 
 if __name__ == "__main__":
-    args = sys.argv[1, 2]
-    img_path, save_path = args
+    args = sys.argv
+    _, img_path, save_path = args
     train()
 
