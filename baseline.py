@@ -101,20 +101,22 @@ def model(latent, real):
     d_fake = discriminator(g, reuse=True)
 
     # define the generator loss
-    g_loss = tf.nn.sigmoid_cross_entropy_with_logits(labels=tf.ones_like(d_fake), logits=d_fake)
+    """g_loss = tf.nn.sigmoid_cross_entropy_with_logits(labels=tf.ones_like(d_fake), logits=d_fake)
+    g_loss = tf.reduce_mean(g_loss)"""
+    g_loss = tf.contrib.gan.losses.wargs.wasserstein_generator_loss(d_fake)
     g_loss = tf.reduce_mean(g_loss)
 
     # define the discriminator loss
-    d_loss_real = tf.nn.sigmoid_cross_entropy_with_logits(labels=tf.ones_like(d_real), logits=d_real)
+    """d_loss_real = tf.nn.sigmoid_cross_entropy_with_logits(labels=tf.ones_like(d_real), logits=d_real)
     d_loss_real = tf.reduce_mean(d_loss_real)
 
-    #d_loss_fake = tf.nn.sigmoid_cross_entropy_with_logits(labels=tf.zeros_like(d_fake), logits=d_fake)
-    #d_loss_fake = tf.reduce_mean(d_loss_fake)
-    d_loss_fake = tf.nn.sigmoid_cross_entropy_with_logits(labels=tf.ones_like(d_fake), logits=d_fake)
-    d_loss_fake = tf.reduce_mean(-d_loss_fake)
+    d_loss_fake = tf.nn.sigmoid_cross_entropy_with_logits(labels=tf.zeros_like(d_fake), logits=d_fake)
+    d_loss_fake = tf.reduce_mean(d_loss_fake)"""
 
+    d_loss = tf.contrib.gan.losses.wargs.wasserstein_discriminator_loss(d_real, d_fake)
+    d_loss = tf.reduce_mean(d_loss)
 
-    return g, g_loss, d_loss_real + d_loss_fake
+    return g, g_loss, d_loss
 
 
 def train(g_weights=None, d_weights=None):
@@ -179,11 +181,11 @@ def train(g_weights=None, d_weights=None):
                 _, gen_loss_ = sess.run([train_g, g_loss_op], feed_dict={fake: gen_img})
 
                 # output test images every 50 step
-                if step % 100 == 0:
+                """if step % 100 == 0:
                     samples = sess.run(g, feed_dict={fake: gen_img})
                     for image in samples[:1]:
                         image = np.uint8((127.5 * image) + 127.5)
-                        Image.fromarray(image).show()
+                        Image.fromarray(image).show()"""
 
                 g_batch_loss = np.append(g_batch_loss, gen_loss_)
                 d_batch_loss = np.append(d_batch_loss, discr_loss_)
@@ -193,7 +195,7 @@ def train(g_weights=None, d_weights=None):
             print("Discriminator loss is: ", np.mean(d_batch_loss), "\n")
 
             # save checkpoint every 10 steps and print to terminal
-            if step % 100 or step == 1.:
+            if step % 100 == 0. or step == 1.:
                 summary = sess.run(merged,
                                    feed_dict={
                                        real: img,
