@@ -21,13 +21,13 @@ def schedule(step):
     :return:
     """
     if step <= 100:
-        return 4
+        return 0
     elif step <= 200:
-        return 8
+        return 1
     elif step <= 800:
-        return 16
+        return 2
     else:
-        return 32
+        return 3
 
 def add_g_layer(inp, filters, kernel_size):
     """
@@ -92,11 +92,12 @@ def generator(inp, frame_size):
             conv_5 = tf.layers.conv2d_transpose(drop_4, 3, 4, strides=2, padding="SAME", name="layer_5")
             tanh = tf.nn.tanh(conv_5)
 
-        out = tf.case([(tf.equal(frame_size, 4), lambda: tf.layers.conv2d_transpose(drop_0, 3, 4, padding="SAME")),
-                       (tf.equal(frame_size, 8), lambda: tf.layers.conv2d_transpose(drop_2, 3, 4, padding="SAME")),
-                      (tf.equal(frame_size, 16), lambda: tf.layers.conv2d_transpose(drop_4, 3, 4, padding="SAME")),
-                       (tf.equal(frame_size, 32), lambda: drop_4)],
-                      exclusive=True)
+        out = tf.case([
+            (tf.equal(frame_size, 4), lambda: tf.nn.tanh(tf.layers.conv2d_transpose(drop_0, 3, 4, padding="SAME"))),
+            (tf.equal(frame_size, 8), lambda: tf.nn.tanh(tf.layers.conv2d_transpose(drop_2, 3, 4, padding="SAME"))),
+            (tf.equal(frame_size, 16), lambda: tf.nn.tanh(tf.layers.conv2d_transpose(drop_4, 3, 4, padding="SAME"))),
+            (tf.equal(frame_size, 32), lambda: tanh)],
+            exclusive=True)
 
     return out
 
@@ -118,7 +119,10 @@ def discriminator(inp, frame_size, reuse):
             relu_1 = tf.nn.relu(batch_1)
             drop_1 = tf.nn.dropout(relu_1, 0.5)
 
-        inp_1 = tf.cond(tf.equal(frame_size, 16), lambda: inp, lambda: drop_1)
+            inp_1 = tf.case([
+                (tf.equal(frame_size, 16), lambda: tf.layers.conv2d(inp, 64, 4, padding="SAME"))
+            ],
+            default= lambda: drop_1, exclusive=True)
 
         with tf.variable_scope("block_1", reuse=reuse):
             # define the third layer 8x8
@@ -128,7 +132,10 @@ def discriminator(inp, frame_size, reuse):
             relu_3 = tf.nn.relu(batch_3)
             drop_3 = tf.nn.dropout(relu_3, 0.5)
 
-        inp_2 = tf.cond(tf.equal(frame_size, 8), lambda: inp, lambda: drop_3)
+            inp_2 = tf.case([
+                (tf.equal(frame_size, 8), lambda: tf.layers.conv2d(inp, 128, 4, padding="SAME"))
+            ],
+                default=lambda: drop_3, exclusive=True)
 
         with tf.variable_scope("block_2", reuse=reuse):
             # define the third layer 4x4
@@ -138,11 +145,14 @@ def discriminator(inp, frame_size, reuse):
             relu_5 = tf.nn.relu(batch_5)
             drop_5 = tf.nn.dropout(relu_5, 0.5)
 
-        inp_3 = tf.cond(tf.equal(frame_size, 4), lambda: inp, lambda: drop_5)
+            inp_3 = tf.case([
+                (tf.equal(frame_size, 4), lambda: tf.layers.conv2d(inp, 256, 4, padding="SAME"))
+            ],
+                default=lambda: drop_5, exclusive=True)
 
         with tf.variable_scope("block_3", reuse=reuse):
             # define the first fully-connected layer
-            r_drop_5 = tf.reshape(inp_3, [batch_size, -1])
+            r_drop_5 = tf.reshape(inp_3, [tf.shape(inp)[0], 4*4*256])
             dense = tf.layers.dense(r_drop_5, 1, name="layer_6")
             dense = tf.squeeze(dense)
 
@@ -189,14 +199,15 @@ def train(g_weights=None, d_weights=None):
     g, g_loss_op, d_loss_op = model(fake, real, frame_size)
 
     train_g_ops, train_d_ops = [], []
+    adam = tf.train.AdamOptimizer(7e-5)
     for i in range(3):
         # Optimizers for the generator and the discriminator
-        train_g = tf.train.AdamOptimizer(7e-5).minimize(
+        train_g = adam.minimize(
             g_loss_op,
             var_list=tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope="generator/block_{}".format(i)))
         train_g_ops.append(train_g)
 
-        train_d = tf.train.AdamOptimizer(7e-5).minimize(
+        train_d = adam.minimize(
             d_loss_op,
             var_list=tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope="discriminator/block_{}".format(i)))
         train_d_ops.append(train_d)
@@ -264,7 +275,8 @@ def train(g_weights=None, d_weights=None):
                 summary = sess.run(merged,
                                    feed_dict={
                                        real: img,
-                                       fake: np.random.normal(loc=0., scale=1., size=[img.shape[0], 1, 1, 128])})
+                                       fake: np.random.normal(loc=0., scale=1., size=[img.shape[0], 1, 1, 128]),
+                                       frame_size: 32})
                 writer.add_summary(summary, step)
                 g_saver.save(sess, "model/model.ckpt", global_step=step - 1)
 
