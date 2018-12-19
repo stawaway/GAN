@@ -62,42 +62,51 @@ def generator(inp, frame_size):
     :param frame_size: Size of the images to generate/train on
     :return:
     """
-    with tf.variable_scope("generator", reuse=False):
+    with tf.variable_scope("generator", reuse=tf.AUTO_REUSE):
         with tf.variable_scope("block_0"):
-            # define the first fully-connected layer
-            dense = tf.layers.dense(inp, 16 * 1024, name="layer_0")
-            r_dense = tf.reshape(dense, [-1, 4, 4, 1024])
-            batch_0 = tf.layers.batch_normalization(r_dense, training=True)
-            relu_0 = tf.nn.relu(batch_0)
-            drop_0 = tf.nn.dropout(relu_0, 0.5)
+            # Convolution on 4x4
+            up = util.upsample(inp)
+            up = util.upsample((up))
+            conv_1 = tf.layers.conv2d(up, 128, 4, padding="SAME", name="layer_0")
+            conv_2 = tf.layers.conv2d(conv_1, 128, 3, padding="SAME", name="layer_1")
+            relu_0 = tf.nn.relu(conv_2)
+            conv_3 = tf.layers.conv2d(relu_0, 64, 3, padding="SAME", name="layer_2")
+        out_0 = tf.layers.conv2d(conv_3, 3, 1, padding="SAME", name="out_0")
+
 
         with tf.variable_scope("block_1"):
-            # define the first convolution layer 8x8
-            conv_1 = tf.layers.conv2d_transpose(drop_0, 512, 4, strides=2, name="layer_1", padding="SAME")
-            conv_2 = tf.layers.conv2d_transpose(conv_1, 512, 4, strides=1, name="layer_2", padding="SAME")
-            batch_2 = tf.layers.batch_normalization(conv_2, training=True)
-            relu_2 = tf.nn.relu(batch_2)
-            drop_2 = tf.nn.dropout(relu_2, 0.5)
+            # Convolution on 8x8
+            up = util.upsample(relu_0)
+            conv_1 = tf.layers.conv2d(up, 128, 3, padding="SAME", name="layer_0")
+            conv_2 = tf.layers.conv2d(conv_1, 128, 3, padding="SAME", name="layer_1")
+            relu_1 = tf.nn.relu(conv_2)
+            conv_3 = tf.layers.conv2d(relu_1, 64, 3, padding="SAME", name="layer_2")
+        out_1 = tf.layers.conv2d(conv_3, 3, 1, padding="SAME", reuse=True, name="out_0")
 
         with tf.variable_scope("block_2"):
-            # define the second layer 16x16
-            conv_3 = tf.layers.conv2d_transpose(drop_2, 256, 4, strides=2, padding="SAME", name="layer_3")
-            conv_4 = tf.layers.conv2d_transpose(conv_3, 256, 4, strides=1, padding="SAME", name="layer_4")
-            batch_4 = tf.layers.batch_normalization(conv_4, training=True)
-            relu_4 = tf.nn.relu(batch_4)
-            drop_4 = tf.nn.dropout(relu_4, 0.5)
+            # Convolution on 16x16
+            up = util.upsample(relu_1)
+            conv_1 = tf.layers.conv2d(up, 128, 3, padding="SAME", name="layer_0")
+            conv_2 = tf.layers.conv2d(conv_1, 128, 3, padding="SAME", name="layer_1")
+            relu_2 = tf.nn.relu(conv_2)
+            conv_3 = tf.layers.conv2d(relu_2, 64, 3, padding="SAME", name="layer_2")
+        out_2 = tf.layers.conv2d(conv_3, 3, 1, padding="SAME", reuse=True, name="out_0")
 
         with tf.variable_scope("block_3"):
-            # define the second layer 32x32
-            conv_5 = tf.layers.conv2d_transpose(drop_4, 3, 4, strides=2, padding="SAME", name="layer_5")
-            tanh = tf.nn.tanh(conv_5)
+            # Convolution on 32x32
+            up = util.upsample(relu_2)
+            conv_1 = tf.layers.conv2d(up, 128, 3, padding="SAME", name="layer_0")
+            conv_2 = tf.layers.conv2d(conv_1, 128, 3, padding="SAME", name="layer_1")
+            relu_3 = tf.nn.relu(conv_2)
+            conv_3 = tf.layers.conv2d(relu_3, 64, 3, padding="SAME", name="layer_2")
+        out_3 = tf.layers.conv2d(conv_3, 3, 1, padding="SAME", reuse=True, name="out_0")
 
         out = tf.case([
-            (tf.equal(frame_size, 4), lambda: tf.nn.tanh(tf.layers.conv2d_transpose(drop_0, 3, 4, padding="SAME"))),
-            (tf.equal(frame_size, 8), lambda: tf.nn.tanh(tf.layers.conv2d_transpose(drop_2, 3, 4, padding="SAME"))),
-            (tf.equal(frame_size, 16), lambda: tf.nn.tanh(tf.layers.conv2d_transpose(drop_4, 3, 4, padding="SAME"))),
-            (tf.equal(frame_size, 32), lambda: tanh)],
-            exclusive=True)
+            (tf.equal(frame_size, 4), lambda: out_0),
+            (tf.equal(frame_size, 8), lambda: out_1),
+            (tf.equal(frame_size, 16), lambda: out_2),
+            (tf.equal(frame_size, 32), lambda: out_3)
+        ], exclusive=True)
 
     return out
 
@@ -112,48 +121,38 @@ def discriminator(inp, frame_size, reuse):
     """
     with tf.variable_scope("discriminator", reuse=reuse):
         with tf.variable_scope("block_0", reuse=reuse):
-            # define the second layer 16x16
-            conv_0 = tf.layers.conv2d(inp, 64, 4, strides=2, padding="SAME", name="layer_0")
-            conv_1 = tf.layers.conv2d(conv_0, 64, 4, strides=1, padding="SAME", name="layer_1")
-            batch_1 = tf.layers.batch_normalization(conv_1, training=True)
-            relu_1 = tf.nn.relu(batch_1)
-            drop_1 = tf.nn.dropout(relu_1, 0.5)
-
-            inp_1 = tf.case([
-                (tf.equal(frame_size, 16), lambda: tf.layers.conv2d(inp, 64, 4, padding="SAME"))
-            ],
-            default= lambda: drop_1, exclusive=True)
+            # Convolution on 32x32
+            in_0 = tf.layers.conv2d(inp, 64, 1, padding="SAME", name="layer_0")
+            conv_1 = tf.layers.conv2d(in_0, 128, 3, padding="SAME", name="layer_1")
+            skip = conv_1
+            conv_2 = tf.layers.conv2d(conv_1, 128, 3, padding="SAME", name="layer_2")
+            conv_2.set_shape([None, 32, 32, 128])
+            down_0 = util.downsample(conv_2)
 
         with tf.variable_scope("block_1", reuse=reuse):
-            # define the third layer 8x8
-            conv_2 = tf.layers.conv2d(inp_1, 128, 4, strides=2, padding="SAME", name="layer_2")
-            conv_3 = tf.layers.conv2d(conv_2, 128, 4, strides=1, padding="SAME", name="layer_3")
-            batch_3 = tf.layers.batch_normalization(conv_3, training=True)
-            relu_3 = tf.nn.relu(batch_3)
-            drop_3 = tf.nn.dropout(relu_3, 0.5)
-
-            inp_2 = tf.case([
-                (tf.equal(frame_size, 8), lambda: tf.layers.conv2d(inp, 128, 4, padding="SAME"))
-            ],
-                default=lambda: drop_3, exclusive=True)
+            # Convolution on 16x16
+            in_1 = tf.case([(tf.equal(frame_size, 16), lambda: skip)], default=lambda: down_0, exclusive=True)
+            conv_1 = tf.layers.conv2d(in_1, 128, 3, padding="SAME", name="layer_0")
+            conv_2 = tf.layers.conv2d(conv_1, 128, 3, padding="SAME", name="layer_1")
+            conv_2.set_shape([None, 16, 16, 128])
+            down_1 = util.downsample(conv_2)
 
         with tf.variable_scope("block_2", reuse=reuse):
-            # define the third layer 4x4
-            conv_4 = tf.layers.conv2d(inp_2, 256, 4, strides=2, padding="SAME", name="layer_4")
-            conv_5 = tf.layers.conv2d(conv_4, 256, 4, strides=1, padding="SAME", name="layer_5")
-            batch_5 = tf.layers.batch_normalization(conv_5, training=True)
-            relu_5 = tf.nn.relu(batch_5)
-            drop_5 = tf.nn.dropout(relu_5, 0.5)
-
-            inp_3 = tf.case([
-                (tf.equal(frame_size, 4), lambda: tf.layers.conv2d(inp, 256, 4, padding="SAME"))
-            ],
-                default=lambda: drop_5, exclusive=True)
+            # Convolution on 8x8
+            in_2 = tf.case([(tf.equal(frame_size, 8), lambda: skip)], default=lambda: down_1, exclusive=True)
+            conv_1 = tf.layers.conv2d(in_2, 128, 3, padding="SAME", name="layer_0")
+            conv_2 = tf.layers.conv2d(conv_1, 128, 3, padding="SAME", name="layer_1")
+            conv_2.set_shape([None, 8, 8, 128])
+            down_2 = util.downsample(conv_2)
 
         with tf.variable_scope("block_3", reuse=reuse):
-            # define the first fully-connected layer
-            r_drop_5 = tf.reshape(inp_3, [tf.shape(inp)[0], 4*4*256])
-            dense = tf.layers.dense(r_drop_5, 1, name="layer_6")
+            # Convolution on 4x4 and then dense layer
+            in_3 = tf.case([(tf.equal(frame_size, 4), lambda: skip)], default=lambda: down_2, exclusive=True)
+            conv_1 = tf.layers.conv2d(in_3, 128, 3, padding="SAME", name="layer_0")
+            conv_2 = tf.layers.conv2d(conv_1, 128, 4, padding="VALID", name="layer_1")
+            conv_2.set_shape([None, 1, 1, 128])
+            conv_2 = tf.squeeze(conv_2, axis=[1, 2])
+            dense = tf.layers.dense(conv_2, 1, name="dense")
             dense = tf.squeeze(dense)
 
     return dense
@@ -193,8 +192,8 @@ def train(g_weights=None, d_weights=None):
     :return:
     """
     img = util.load_img(img_path, [32, 32])
-    fake = tf.placeholder(dtype=tf.float32, shape=[batch_size, 1, 1, 128], name="latent")
-    real = tf.placeholder(dtype=tf.float32, shape=[batch_size, 32, 32, 3], name="real")
+    fake = tf.placeholder(dtype=tf.float32, shape=[None, 1, 1, 128], name="latent")
+    real = tf.placeholder(dtype=tf.float32, shape=[None, 32, 32, 3], name="real")
     frame_size = tf.placeholder(dtype=tf.int32, shape=[], name="frame_size")
     g, g_loss_op, d_loss_op = model(fake, real, frame_size)
 
