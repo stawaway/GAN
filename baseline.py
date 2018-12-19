@@ -108,10 +108,10 @@ def model(latent, real):
     d_loss_real = tf.nn.sigmoid_cross_entropy_with_logits(labels=tf.ones_like(d_real), logits=d_real)
     d_loss_real = tf.reduce_mean(d_loss_real)
 
-    d_loss_fake = tf.nn.sigmoid_cross_entropy_with_logits(labels=tf.zeros_like(d_fake), logits=d_fake)
-    d_loss_fake = tf.reduce_mean(d_loss_fake)
-    #d_loss_fake = tf.nn.sigmoid_cross_entropy_with_logits(labels=tf.ones_like(d_fake), logits=d_fake)
-    #d_loss_fake = tf.reduce_mean(-d_loss_fake)
+    #d_loss_fake = tf.nn.sigmoid_cross_entropy_with_logits(labels=tf.zeros_like(d_fake), logits=d_fake)
+    #d_loss_fake = tf.reduce_mean(d_loss_fake)
+    d_loss_fake = tf.nn.sigmoid_cross_entropy_with_logits(labels=tf.ones_like(d_fake), logits=d_fake)
+    d_loss_fake = tf.reduce_mean(-d_loss_fake)
 
 
     return g, g_loss, d_loss_real + d_loss_fake
@@ -125,8 +125,8 @@ def train(g_weights=None, d_weights=None):
     :return:
     """
     img = util.load_img(img_path, [32, 32])
-    fake = tf.placeholder(dtype=tf.float32, shape=[batch_size, 1, 1, 128], name="latent")
-    real = tf.placeholder(dtype=tf.float32, shape=[batch_size, 32, 32, 3], name="real")
+    fake = tf.placeholder(dtype=tf.float32, shape=[None, 1, 1, 128], name="latent")
+    real = tf.placeholder(dtype=tf.float32, shape=[None, 32, 32, 3], name="real")
     g, g_loss_op, d_loss_op = model(fake, real)
 
     # Optimizers for the generator and the discriminator
@@ -170,7 +170,7 @@ def train(g_weights=None, d_weights=None):
                 batch = img[min_:max_, :, :, :]
 
                 # generate images
-                gen_img = np.random.normal(loc=0., scale=1., size=[batch_size, 1, 1, 128])
+                gen_img = np.random.normal(loc=0., scale=1., size=[max_ - min_, 1, 1, 128])
 
                 # train the discriminator on the fake images
                 _, discr_loss_ = sess.run([train_d, d_loss_op], feed_dict={real: batch, fake: gen_img})
