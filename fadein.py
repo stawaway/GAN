@@ -13,6 +13,7 @@ img_path = "/Users/williamst-arnaud/U de M/IFT6269/celeba-128"
 eps = float(np.finfo(np.float32).tiny)
 restore_path = None
 epochs = 2000
+alpha = 32
 
 
 def schedule(step, epochs):
@@ -94,80 +95,39 @@ def generator(inp, alpha):
     :param frame_size: Size of the images to generate/train on
     :return:
     """
-    inp4, inp8, inp16, inp32 = inp
-    with tf.variable_scope("generator", reuse=tf.AUTO_REUSE):
-        # 4x4 convolutions
-        up_0 = util.upsample(inp4)
-        relu_0 = generator_layer(up_0, 4, 0)
-        out_0 = generator_last(relu_0, 4)
-        for var in tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope="generator"):
-            tf.add_to_collection("g4", var)
+    with tf.variable_scope("generator"):
+        # define the first fully-connected layer
+        lay = tf.layers.dense(inp, 16*1024, name="layer_0")
+        lay = tf.reshape(lay, [-1, 4, 4, 1024])
+        lay = tf.nn.relu(lay)
 
-    with tf.variable_scope("generator", reuse=tf.AUTO_REUSE):
-        # 8x8 convolutions
-        up_0 = util.upsample(inp8)
-        relu_0 = generator_layer(up_0, 4, 0)
-        relu_1 = generator_layer(relu_0, 8, 1)
-        out_1 = generator_fadein(relu_0, relu_1, alpha)
-        for var in tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope="generator"):
-            tf.add_to_collection("g8", var)
+        # define the first convolution layer 8x8
+        lay = util.upsample(lay)
+        lay = tf.layers.conv2d(lay, 128, 4, name="layer_1", padding="SAME")
+        lay = tf.layers.conv2d(lay, 128, 4, name="layer_2", padding="SAME")
+        lay = tf.nn.relu(lay)
 
-    with tf.variable_scope("generator", reuse=tf.AUTO_REUSE):
-        # 16x16 convolutions
-        up_0 = util.upsample(inp16)
-        relu_0 = generator_layer(up_0, 4, 0)
-        relu_1 = generator_layer(relu_0, 8, 1)
-        relu_2 = generator_layer(relu_1, 16, 2)
-        out_2 = generator_fadein(relu_1, relu_2, alpha)
-        for var in tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope="generator"):
-            tf.add_to_collection("g16", var)
+        # define the second layer 16x16
+        lay = util.upsample(lay)
+        lay = tf.layers.conv2d(lay, 128, 4, padding="SAME", name="layer_3")
+        lay = tf.layers.conv2d(lay, 128, 4, padding="SAME", name="layer_4")
+        lay = tf.nn.relu(lay)
 
-    with tf.variable_scope("generator", reuse=tf.AUTO_REUSE):
-        # 32x32 convolutions
-        up_0 = util.upsample(inp32)
-        relu_0 = generator_layer(up_0, 4, 0)
-        relu_1 = generator_layer(relu_0, 8, 1)
-        relu_2 = generator_layer(relu_1, 16, 2)
-        relu_3 = generator_layer(relu_2, 32, 3)
-        out_3 = generator_fadein(relu_2, relu_3, alpha)
-        for var in tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope="generator"):
-            tf.add_to_collection("g32", var)
+        # define the second layer 32x32
+        lay = util.upsample(lay)
+        fade_l = tf.layers.conv2d(lay, 128, 1, padding="SAME", name="to_rgb_0")
+        lay = tf.layers.conv2d(lay, 128, 4, padding="SAME", name="layer_5")
+        lay = tf.layers.conv2d(lay, 128, 4, padding="SAME", name="layer_6")
+        fade_r = tf.layers.conv2d(lay, 128, 1, padding="SAME", name="to_rgb_1")
+        lay = (1. - alpha) * fade_l + alpha * fade_r
+        lay = tf.layers.conv2d(lay, 3, 4, strides=1, padding="SAME", name="layer_7")
 
-    return [out_0, out_1, out_2, out_3]
+        lay = tf.nn.tanh(lay)
+
+    return lay
 
 
-def discriminator_layer(inp, frame_size, number):
-    with tf.variable_scope("block_{}".format(number), reuse=tf.AUTO_REUSE):
-        # Convolution on 32x32
-        conv_1 = tf.layers.conv2d(inp, 128, 3, padding="SAME", name="layer_0")
-        conv_2 = tf.layers.conv2d(conv_1, 128, 3, padding="SAME", name="layer_1")
-        relu_0 = tf.nn.relu(conv_2)
-        relu_0.set_shape([None, frame_size, frame_size, 128])
-        down = util.downsample(relu_0)
-
-    return down
-
-
-def discriminator_fadein(inp, relu, alpha):
-    fade_0_l = tf.layers.conv2d(util.downsample(inp), 128, 1, padding="SAME", reuse=True, name="from_rgb")
-    out_0 = (1. - alpha) * fade_0_l + alpha * relu
-
-    return out_0
-
-
-def discriminator_dense(inp):
-    with tf.variable_scope("Dense", reuse=tf.AUTO_REUSE):
-        conv_1 = tf.layers.conv2d(inp, 128, 3, padding="SAME", name="layer_0")
-        conv_2 = tf.layers.conv2d(conv_1, 128, 4, padding="VALID", name="layer_1")
-        conv_2.set_shape([None, 1, 1, 128])
-        conv_2 = tf.squeeze(conv_2, axis=[1, 2])
-        dense = tf.layers.dense(conv_2, 1, name="dense")
-        dense = tf.squeeze(dense)
-
-    return dense
-
-
-def discriminator(inp, reuse, alpha):
+def discriminator(inp, alpha, reuse):
     """
     Function that creates the discriminator network
     :param inp: Input to  the discriminator
@@ -175,45 +135,35 @@ def discriminator(inp, reuse, alpha):
     :param reuse: If the network reuses previously created weights or not
     :return:
     """
-    inp4, inp8, inp16, inp32 = inp
-    with tf.variable_scope("discriminator", reuse=tf.AUTO_REUSE):
-        # 4x4 convolutions
-        in_0 = tf.layers.conv2d(inp4, 128, 1, padding="SAME", name="from_rgb")
-        dense_0 = discriminator_dense(in_0)
-        for var in tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope="discriminator"):
-            tf.add_to_collection("d4", var)
 
-    with tf.variable_scope("discriminator", reuse=tf.AUTO_REUSE):
-        # 8x8 convolutions
-        in_1 = tf.layers.conv2d(inp8, 128, 1, padding="SAME", reuse=True, name="from_rgb")
-        relu_0 = discriminator_layer(in_1, 8, 1)
-        out_0 = discriminator_fadein(inp8, relu_0, alpha)
-        dense_1 = discriminator_dense(out_0)
-        for var in tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope="discriminator"):
-            tf.add_to_collection("d8", var)
+    with tf.variable_scope("discriminator", reuse=reuse):
+        # define the second layer 16x16
+        fade_l = util.downsample(inp)
+        fade_l = tf.layers.conv2d(fade_l, 128, 1, padding="SAME", name="from_rgb_0")
+        fade_r = tf.layers.conv2d(fade_l, 128, 1, padding="SAME", name="from_rgb_1")
+        lay = tf.nn.relu(fade_r)
+        lay = tf.layers.conv2d(lay, 128, 4, padding="SAME", name="layer_0")
+        lay = tf.nn.relu(lay)
+        lay = tf.layers.conv2d(lay, 128, 4, padding="SAME", name="layer_1")
+        lay = tf.nn.relu(lay)
+        lay = (1. - alpha) * fade_l + alpha * lay
 
-    with tf.variable_scope("discriminator", reuse=tf.AUTO_REUSE):
-        # 16x16 Convolutions
-        in_2 = tf.layers.conv2d(inp16, 128, 1, padding="SAME", reuse=True, name="from_rgb")
-        relu_0 = discriminator_layer(in_2, 16, 1)
-        fade_0 = discriminator_fadein(inp16, relu_0, alpha)
-        relu_1 = discriminator_layer(fade_0, 8, 2)
-        dense_2 = discriminator_dense(relu_1)
-        for var in tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope="discriminator"):
-            tf.add_to_collection("d16", var)
+        # define the third layer 8x8
+        lay = tf.layers.conv2d(lay, 128, 4, padding="SAME", name="layer_2")
+        lay = tf.layers.conv2d(lay, 128, 4, padding="SAME", name="layer_3")
+        lay = tf.nn.relu(lay)
 
-    with tf.variable_scope("discriminator", reuse=tf.AUTO_REUSE):
-        # 32x32 Convolutions
-        in_3 = tf.layers.conv2d(inp32, 128, 1, padding="SAME", reuse=True, name="from_rgb")
-        relu_0 = discriminator_layer(in_3, 32, 0)
-        fade_0 = discriminator_fadein(inp32, relu_0, alpha)
-        relu_1 = discriminator_layer(fade_0, 16, 1)
-        relu_2 = discriminator_layer(relu_1, 8, 2)
-        dense_3 = discriminator_dense(relu_2)
-        for var in tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope="discriminator"):
-            tf.add_to_collection("d32", var)
+        # define the third layer 4x4
+        lay = tf.layers.conv2d(lay, 128, 4, padding="SAME", name="layer_4")
+        lay = tf.layers.conv2d(lay, 128, 4, padding="SAME", name="layer_5")
+        lay = tf.nn.relu(lay)
 
-    return dense_0, dense_1, dense_2, dense_3
+        # define the first fully-connected layer
+        lay = tf.reshape(lay, [-1, 4 * 4 * 256])
+        lay = tf.layers.dense(lay, 1, name="layer_6")
+        lay = tf.squeeze(lay)
+
+    return lay
 
 
 def model(latent, real, alpha):
@@ -229,23 +179,18 @@ def model(latent, real, alpha):
     d_real = discriminator(real, reuse=False, alpha=alpha)
     d_fake = discriminator(g, reuse=True, alpha=alpha)
 
-    g_loss_ops, d_loss_ops = [], []
-    for i in range(4):
-        # define the generator loss
-        g_loss = tf.nn.sigmoid_cross_entropy_with_logits(labels=tf.ones_like(d_fake[i]), logits=d_fake[i])
-        g_loss = tf.reduce_mean(g_loss)
-        g_loss_ops.append(g_loss)
+    # define the generator loss
+    g_loss = tf.nn.sigmoid_cross_entropy_with_logits(labels=tf.ones_like(d_fake), logits=d_fake)
+    g_loss = tf.reduce_mean(g_loss)
 
-        # define the discriminator loss
-        d_loss_real = tf.nn.sigmoid_cross_entropy_with_logits(labels=tf.ones_like(d_real[i]), logits=d_real[i])
-        d_loss_real = tf.reduce_mean(d_loss_real)
+    # define the discriminator loss
+    d_loss_real = tf.nn.sigmoid_cross_entropy_with_logits(labels=tf.ones_like(d_real), logits=d_real)
+    d_loss_real = tf.reduce_mean(d_loss_real)
 
-        d_loss_fake = tf.nn.sigmoid_cross_entropy_with_logits(labels=tf.zeros_like(d_fake[i]), logits=d_fake[i])
-        d_loss_fake = tf.reduce_mean(d_loss_fake)
+    d_loss_fake = tf.nn.sigmoid_cross_entropy_with_logits(labels=tf.zeros_like(d_fake), logits=d_fake)
+    d_loss_fake = tf.reduce_mean(d_loss_fake)
 
-        d_loss_ops.append(d_loss_real + d_loss_fake)
-
-    return g_loss_ops, d_loss_ops, {"4x4": g[0], "8x8": g[1], "16x16": g[2], "32x32": g[3]}
+    return g, g_loss, d_loss_real + d_loss_fake
 
 
 def train(g_weights=None, d_weights=None):
@@ -255,41 +200,22 @@ def train(g_weights=None, d_weights=None):
     :param d_weights: Pre-trained weights for the network
     :return:
     """
-    img = {}
-    for i in range(4):
-        h = 4 * 2**i
-        w = h
-        img["{i}x{j}".format(i=h, j=w)] = util.load_img(img_path, [h, w])
-    fake = [tf.placeholder_with_default(tf.zeros(shape=[1, 1, 1, 128], dtype=tf.float32),
-                                        shape=[None, 1, 1, 128], name="real") for i in range(4)]
-    real = [tf.placeholder_with_default(tf.zeros(shape=[1, 4*2**i, 4*2**i, 3], dtype=tf.float32),
-                                        shape=[None, 4*2**i, 4*2**i, 3], name="real") for i in range(4)]
+    img = util.load_img(img_path, [32, 32])
+    fake = tf.placeholder(dtype=tf.float32, shape=[None, 1, 1, 128], name="latent")
+    real = tf.placeholder(dtype=tf.float32, shape=[None, 32, 32, 3], name="real")
     alpha_pl = tf.placeholder(dtype=tf.float32, shape=[], name="alpha")
-    g_loss_ops, d_loss_ops, gen_ops = model(fake, real, alpha_pl)
+    g, g_loss_op, d_loss_op = model(fake, real, alpha)
 
-    train_g_ops, train_d_ops = {}, {}
+    # Optimizers for the generator and the discriminator
     adam = tf.train.AdamOptimizer(7e-5)
-    for pos, i in enumerate([4, 8, 16, 32]):
-        # Optimizers for the generator and the discriminator
-        train_g = adam.minimize(g_loss_ops[pos], var_list=tf.get_collection("g{}".format(i), scope="generator"))
-
-        train_g_ops["{i}x{i}".format(i=i)] = train_g
-
-        train_d = adam.minimize(d_loss_ops[pos], var_list=tf.get_collection("d{}".format(i), scope="discriminator"))
-
-        train_d_ops["{i}x{i}".format(i=i)] = train_d
-
+    train_g = adam.minimize(g_loss_op,
+                            var_list=tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope="generator"))
+    train_d = adam.minimize(d_loss_op,
+                            var_list=tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope="discriminator"))
 
     # add summary scalars
-
-    tf.summary.scalar("generator loss 4x4", g_loss_ops[0])
-    tf.summary.scalar("generator loss 8x8", g_loss_ops[1])
-    tf.summary.scalar("generator loss 16x416", g_loss_ops[2])
-    tf.summary.scalar("generator loss 32x32", g_loss_ops[3])
-    tf.summary.scalar("discriminator loss 4x4", d_loss_ops[0])
-    tf.summary.scalar("discriminator loss 8x8", d_loss_ops[1])
-    tf.summary.scalar("discriminator loss 16x16", d_loss_ops[2])
-    tf.summary.scalar("discriminator loss 32x32", d_loss_ops[3])
+    tf.summary.scalar("discriminator loss", d_loss_op)
+    tf.summary.scalar("generator loss", g_loss_op)
     merged = tf.summary.merge_all()
 
     # savers to save the trained weights for the generator and the discriminator
@@ -314,36 +240,28 @@ def train(g_weights=None, d_weights=None):
         while True:
             g_batch_loss = np.empty([0, ])
             d_batch_loss = np.empty([0, ])
-            format, alpha = schedule(step, epochs)
-            j = int(np.log2(float(format[0])))-2
-            for i in np.arange(np.ceil(img[format].shape[0] / batch_size), dtype=np.int32):
+            for i in np.arange(np.ceil(img.shape[0] / batch_size), dtype=np.int32):
                 min_ = batch_size * i
-                max_ = np.minimum(min_ + batch_size, img[format].shape[0])
+                max_ = np.minimum(min_ + batch_size, img.shape[0])
 
-                batch = img[format][min_:max_, :, :, :]
+                batch = img[min_:max_, :, :, :]
 
                 # generate images
-                noise = np.random.normal(loc=0., scale=1., size=[batch_size, 1, 1, 128])
+                gen_img = np.random.normal(loc=0., scale=1., size=[max_ - min_, 1, 1, 128])
 
                 # train the discriminator on the fake images
-                gen_img = sess.run(gen_ops[format], feed_dict={real[j]: batch, fake[j]: noise, alpha_pl: alpha})
-                _, discr_loss_ = sess.run([train_d_ops[format], d_loss_ops],
-                                          feed_dict={real[j]: batch,
-                                                     fake[j]: noise,
-                                                     gen_ops[format]: gen_img,
-                                                     alpha_pl: alpha
-                                                     })
+                _, discr_loss_ = sess.run([train_d, d_loss_op], feed_dict={real: batch, fake: gen_img,
+                                                                           alpha_pl: 1.})
 
                 # train the generator to fool discriminator
-                _, gen_loss_ = sess.run([train_g_ops[format], g_loss_ops],
-                                        feed_dict={fake[j]: noise, alpha_pl: alpha})
+                _, gen_loss_ = sess.run([train_g, g_loss_op], feed_dict={fake: gen_img, alpha_pl: 1.})
 
                 # output test images every 50 step
-                if step % 1000 == 0:
-                    samples = gen_img
+                """if step % 100 == 0:
+                    samples = sess.run(g, feed_dict={fake: gen_img})
                     for image in samples[:1]:
                         image = np.uint8((127.5 * image) + 127.5)
-                        Image.fromarray(image).show()
+                        Image.fromarray(image).show()"""
 
                 g_batch_loss = np.append(g_batch_loss, gen_loss_)
                 d_batch_loss = np.append(d_batch_loss, discr_loss_)
@@ -353,23 +271,22 @@ def train(g_weights=None, d_weights=None):
             print("Discriminator loss is: ", np.mean(d_batch_loss), "\n")
 
             # save checkpoint every 10 steps and print to terminal
-            if step % 100 or step == 1.:
+            if step % 100 == 0. or step == 1.:
                 summary = sess.run(merged,
                                    feed_dict={
-                                       real[j]: img[format],
-                                       fake[j]: np.random.normal(loc=0., scale=1.,
-                                                              size=[img[format].shape[0], 1, 1, 128]),
-                                       alpha_pl: alpha})
+                                       real: img,
+                                       fake: np.random.normal(loc=0., scale=1., size=[img.shape[0], 1, 1, 128]),
+                                       alpha_pl: 1.
+                                    })
                 writer.add_summary(summary, step)
                 g_saver.save(sess, "model/model.ckpt", global_step=step - 1)
 
-            if step > epochs:  # np.abs(gen_loss - np.mean(g_batch_loss)) < 0.0001:
+            if step > 2000:  # np.abs(gen_loss - np.mean(g_batch_loss)) < 0.0001:
                 gen_loss, discr_loss = np.mean(g_batch_loss), np.mean(d_batch_loss)
                 g_saver.save(sess, "model/g_weights.ckpt")
                 d_saver.save(sess, "model/d_weights.ckpt")
-                latent = np.random.normal(0., 1., size=[batch_size, 1, 1, 128])
-                images = sess.run(gen_ops[format], feed_dict={fake[j]: latent, alpha_pl: alpha})
-                print(images.shape)
+                latent = np.random.normal(0., 1. , size=[batch_size, 1, 1, 128])
+                images = sess.run(g ,feed_dict={fake: latent, alpha_pl: 1.})
                 util.save_img((127.5 * images) + 127.5, save_path)
 
                 break
@@ -384,10 +301,8 @@ def sample():
     :return:
     """
     fake = tf.placeholder(dtype=tf.float32, shape=[batch_size, 1, 1, 128], name="latent")
-    frame_size = tf.placeholder(dtype=tf.int32, shape=[], name="frame_size")
-    alpha_pl = tf.placeholder(dtype=tf.float32, shape=[], name="alpha")
 
-    g = generator(fake, frame_size, alpha_pl)
+    g = generator(fake)
 
     saver = tf.train.Saver(tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope="generator"))
 
@@ -399,7 +314,7 @@ def sample():
 
         latent = np.random.normal(loc=0., scale=1., size=[10, 1, 1, 128])
 
-        samples = sess.run(g, feed_dict={fake: latent, frame_size: 32})
+        samples = sess.run(g, feed_dict={fake: latent})
 
         for img in samples:
             img = np.uint8((127.5 * img) + 127.5)
