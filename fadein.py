@@ -368,7 +368,8 @@ def train(g_weights=None, d_weights=None):
                 g_saver.save(sess, "model/g_weights.ckpt")
                 d_saver.save(sess, "model/d_weights.ckpt")
                 latent = np.random.normal(0., 1., size=[batch_size, 1, 1, 128])
-                images = sess.run(gen_ops[3], feed_dict={fake: latent, alpha_pl: alpha})
+                images = sess.run(gen_ops[format], feed_dict={fake[j]: latent, alpha_pl: alpha})
+                print(images.shape)
                 util.save_img((127.5 * images) + 127.5, save_path)
 
                 break
