@@ -8,11 +8,14 @@ def first_block(inp):
     :param inp: Batch of input images
     :return:
     """
-    # create first layer block
-    lay = util.conv_lay(inp, filter_size=[1, 1], num_filters=4, scope="D/4x4/lay_0", collection="DISCR_VAR")
-    lay = util.conv_lay(lay, filter_size=[3, 3], num_filters=4, scope="D/4x4/lay_1", collection="DISCR_VAR")
-    lay = util.conv_lay(lay, filter_size=[3, 3], num_filters=8, scope="D/4x4/lay_2", collection="DISCR_VAR")
-    lay = util.downsample(lay)
+    with tf.variable_scope("4x4"):
+        # create first layer block
+        lay = util.conv_lay(inp, filter_size=[1, 1], num_filters=4, activation="leaky_relu", scope="lay_0")
+        lay = util.conv_lay(lay, filter_size=[3, 3], num_filters=4, activation="leaky_relu", scope="lay_1")
+        lay = util.conv_lay(lay, filter_size=[3, 3], num_filters=8, activation="leaky_relu", scope="lay_2")
+
+        # downsample
+        lay = util.downsample(lay)
 
     return lay
 
@@ -25,22 +28,19 @@ def layer_block(inp, num_filters, name):
     :param name: Name of the current block
     :return:
     """
-    in_ch = inp.shape[-1].value
+    with tf.variable_scope(name):
+        in_ch = inp.shape[-1].value
 
-    # create sub-layer and feed the upscaled block
-    lay = util.conv_lay(inp, filter_size=[3, 3], num_filters=in_ch, scope=name+"/lay_0", collection="DISCR_VAR")
+        # create sub-layer and feed the upscaled block
+        lay = util.conv_lay(inp, filter_size=[3, 3], num_filters=in_ch,
+                            activation="leaky_relu", scope="lay_0")
 
-    # activation function
-    lay = tf.nn.relu(lay)
+        # next sub-layer
+        lay = util.conv_lay(lay, filter_size=[3, 3], num_filters=num_filters,
+                            activation="leaky_relu", scope="lay_1")
 
-    # next sub-layer
-    lay = util.conv_lay(lay, filter_size=[3, 3], num_filters=num_filters, scope=name+"/lay_1", collection="DISCR_VAR")
-
-    # activation function
-    lay = tf.nn.relu(lay)
-
-    # downsample
-    lay = util.downsample(lay)
+        # downsample
+        lay = util.downsample(lay)
 
     return lay
 
@@ -51,39 +51,36 @@ def final_block(inp):
     :param inp: Input block
     :return:
     """
-    # create sub-layer and feed the upscaled block
-    lay = util.conv_lay(inp, filter_size=[3, 3], num_filters=128, scope="D/128x128/lay_0", collection="DISCR_VAR")
+    with tf.variable_scope("128x128"):
+        # create sub-layer and feed the upscaled block
+        lay = util.conv_lay(inp, filter_size=[3, 3], num_filters=128, activation="leaky_relu", scope="lay_0")
 
-    # activation function
-    lay = tf.nn.relu(lay)
+        # next sub-layer
+        lay = util.conv_lay(lay, filter_size=[4, 4], num_filters=128, activation="leaky_relu", scope="lay_1")
 
-    # next sub-layer
-    lay = util.conv_lay(lay, filter_size=[4, 4], num_filters=128, scope="D/128x128/lay_1", collection="DISCR_VAR")
-
-    # activation function
-    lay = tf.nn.relu(lay)
-
-    # fully-connected layer
-    lay = util.dense_lay(lay, "D/128x128/dense", collection="DISCR_VAR")
+        # fully-connected layer
+        lay = util.dense_lay(lay, "dense")
 
     return lay
 
 
-def make(inp):
+def make(inp, reuse):
     """
     Function that returns a discriminator network
     :param inp: Placeholder for input images of shape [batch_size, h, w, in_ch]
+    :param reuse: If the network reuses the same variables as previously created (used for the fake the part)
     :return: The constructed discriminator network
     """
-    # Create the first block for the network
-    block = first_block(inp)
+    with tf.variable_scope("D", reuse):
+        # Create the first block for the network
+        block = first_block(inp)
 
-    # Create the other blocks for the discriminator
-    for i in reversed(range(1, 5)):
-        num_filters = 128
-        block = layer_block(block, num_filters, "D/{k}x{k}".format(k=4 * 2**i))
+        # Create the other blocks for the discriminator
+        for i in reversed(range(1, 5)):
+            num_filters = 128
+            block = layer_block(block, num_filters, "{k}x{k}".format(k=4 * 2**i))
 
-    # Create the final block for the generator
-    block = final_block(block)
+        # Create the final block for the generator
+        block = final_block(block)
 
     return block

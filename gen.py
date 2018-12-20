@@ -8,14 +8,15 @@ def first_block(z):
     :param z: Latent vector placeholder of size [batch_size, 1, 1, 128]
     :return:
     """
-    # create first layer block
-    lay = tf.image.resize_images(z, size=[4, 4], method=tf.image.ResizeMethod.NEAREST_NEIGHBOR)
+    with tf.variable_scope("G/4x4"):
+        # create first layer block
+        lay = tf.image.resize_images(z, size=[4, 4], method=tf.image.ResizeMethod.NEAREST_NEIGHBOR)
 
-    lay = util.conv_lay(lay, filter_size=[4, 4], num_filters=128, scope="G/4x4/lay_0", collection="GEN_VAR")
-    lay = util.conv_lay(lay, filter_size=[3, 3], num_filters=128, scope="G/4x4/lay_1", collection="GEN_VAR")
+        lay = util.conv_lay(lay, filter_size=[4, 4], num_filters=128, activation="leaky_relu", scope="lay_0")
+        lay = util.conv_lay(lay, filter_size=[3, 3], num_filters=128, activation="leaky_relu", scope="lay_1")
 
-    # normalization
-    lay = util.pixel_normalization(lay)
+        # normalization
+        lay = util.pixel_normalization(lay)
 
     return lay
 
@@ -24,27 +25,28 @@ def layer_block(inp, num_filters, name):
     """
     Function that creates the middle layer blocks
     :param inp: Input block
+    :param smooth: scaling factor
     :param num_filters: Number of feature maps in each layer of the block
     :param name: Name of the current block
     :return:
     """
-    # upsample
-    lay = util.upsample(inp)
+    with tf.variable_scope(name):
+        # upsample
+        lay_ = util.upsample(inp)
 
-    # create sub-layer and feed the upscaled block
-    lay = util.conv_lay(lay, filter_size=[3, 3], num_filters=num_filters, scope=name+"/lay_0", collection="GEN_VAR")
+        # create sub-layer and feed the upscaled block
+        lay = util.conv_lay(lay_, filter_size=[3, 3], num_filters=num_filters,
+                            activation="leaky_relu", scope="lay_0")
 
-    # activation function
-    lay = tf.nn.leaky_relu(lay)
+        # normalization
+        lay = util.pixel_normalization(lay)
 
-    # next sub-layer
-    lay = util.conv_lay(lay, filter_size=[3, 3], num_filters=num_filters, scope=name+"/lay_1", collection="GEN_VAR")
+        # next sub-layer
+        lay = util.conv_lay(lay, filter_size=[3, 3], num_filters=num_filters,
+                            activation="leaky_relu", scope="lay_1")
 
-    # activation function
-    lay = tf.nn.leaky_relu(lay)
-
-    # normalization
-    lay = util.pixel_normalization(lay)
+        # normalization
+        lay = util.pixel_normalization(lay)
 
     return lay
 
@@ -55,29 +57,27 @@ def final_block(inp):
     :param inp: Input block
     :return:
     """
-    # upsample
-    lay = util.upsample(inp)
+    with tf.variable_scope("G/128x128"):
+        # upsample
+        lay = util.upsample(inp)
 
-    # create sub-layer and feed the upscaled block
-    lay = util.conv_lay(lay, filter_size=[3, 3], num_filters=4, scope="G/128x128/lay_0", collection="GEN_VAR")
+        # create sub-layer and feed the upscaled block
+        lay = util.conv_lay(lay, filter_size=[3, 3], num_filters=4,
+                            activation="leaky_relu", scope="lay_0")
 
-    # activation function
-    lay = tf.nn.leaky_relu(lay)
+        # normalization
+        lay = util.pixel_normalization(lay)
 
-    # next sub-layer
-    lay = util.conv_lay(lay, filter_size=[3, 3], num_filters=4, scope="G/128x128/lay_1", collection="GEN_VAR")
+        # next sub-layer
+        lay = util.conv_lay(lay, filter_size=[3, 3], num_filters=4,
+                            activation="leaky_relu", scope="lay_1")
 
-    # normalization
-    lay = util.pixel_normalization(lay)
+        # normalization
+        lay = util.pixel_normalization(lay)
 
-    # activation function
-    lay = tf.nn.leaky_relu(lay)
-
-    # next sub-layer
-    lay = util.conv_lay(lay, filter_size=[1, 1], num_filters=3, scope="G/128x128/lay_2", collection="GEN_VAR")
-
-    # put images in the range [-1, 1]
-    lay = tf.nn.tanh(lay)
+        # next sub-layer
+        lay = util.conv_lay(lay, filter_size=[1, 1], num_filters=3,
+                            activation="leaky_relu", scope="lay_2")
 
     return lay
 

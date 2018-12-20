@@ -25,8 +25,10 @@ def train(img):
     Create first blocks for both the generator and the discriminator networks and train
     """
     g = gen.make(fake)
-    d_fake = discr.make(g)
-    d_real = discr.make(real)
+    g = tf.nn.tanh(g) # puts images in the [-1, 1] range
+    d_real = discr.make(real, reuse=False)
+    d_fake = discr.make(g, reuse=True)
+
 
     """
     Create the loss function
@@ -46,19 +48,29 @@ def train(img):
             logits=d_fake))
 
     """
+    Add summary operations for each loss
+    """
+    tf.summary.scalar("D_Loss", d_loss_op)
+    tf.summary.scalar("G_Loss", g_loss_op)
+    merged = tf.summary.merge_all()
+
+    """
     Create the optimizers that will minimize the loss function for D and G
     """
-    with tf.variable_scope("G/RMS"):
-        train_g = tf.train.RMSPropOptimizer(1e-3).minimize(g_loss_op,
-                                                           var_list=tf.get_collection("GEN_VAR"))
-    with tf.variable_scope("D/RMS"):
-        train_d = tf.train.RMSPropOptimizer(1e-3).minimize(d_loss_op,
-                                                           var_list=tf.get_collection("DISCR_VAR"))
+    train_g = tf.train.RMSPropOptimizer(5e-5).minimize(g_loss_op,
+                                                       var_list=tf.get_collection(
+                                                           tf.GraphKeys.TRAINABLE_VARIABLES,
+                                                       scope="G"))
+
+    train_d = tf.train.RMSPropOptimizer(5e-5).minimize(d_loss_op,
+                                                       var_list=tf.get_collection(
+                                                           tf.GraphKeys.TRAINABLE_VARIABLES,
+                                                       scope="D"))
 
     """
     Create saver to store the trained weights
     """
-    saver = tf.train.Saver(tf.get_collection("GEN_VAR"))
+    saver = tf.train.Saver(tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope="G"))
 
     """
     Train the network
@@ -66,6 +78,9 @@ def train(img):
     gen_loss = np.inf
     discr_loss = np.inf
     with tf.Session() as sess:
+        # create writer for summaries
+        writer = tf.summary.FileWriter("debug", sess.graph)
+
         # initialize the GAN
         sess.run(tf.variables_initializer(tf.global_variables()))
 
@@ -96,10 +111,15 @@ def train(img):
             print("Discriminator loss is: ", np.mean(d_batch_loss), "\n")
 
             # save checkpoint every 10 steps and print to terminal
-            if step % 10 == 0:
-                saver.save(sess, "model/model.ckpt", global_step=step)
+            if step % 10 or step == 1.:
+                summary = sess.run(merged,
+                                     feed_dict={
+                                         real: img,
+                                         fake: np.random.normal(loc=0., scale=1., size=[img.shape[0], 1, 1, 128])})
+                writer.add_summary(summary, step)
+                saver.save(sess, "model/model.ckpt", global_step=step-1)
 
-            if step > 1000:# np.abs(gen_loss - np.mean(g_batch_loss)) < 0.0001:
+            if step > 400:# np.abs(gen_loss - np.mean(g_batch_loss)) < 0.0001:
                 gen_loss, discr_loss = np.mean(g_batch_loss), np.mean(d_batch_loss)
                 saver.save(sess, "model/trained_model.ckpt")
                 break

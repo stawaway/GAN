@@ -34,7 +34,7 @@ def main(path):
     """
     with tf.Session() as sess:
         # load trained variables for model
-        saver.restore(sess, "model/model.ckpt-10")
+        saver.restore(sess, "model/model.ckpt-100")
 
         # generate images
         latent = np.random.normal(loc=0., scale=1., size=[batch_size, 1, 1, 128])

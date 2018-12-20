@@ -52,7 +52,7 @@ def save_img(x, path):
         i += 1
 
 
-def upsample(x):
+def upsample(x, scale=(2, 2)):
     """
     Function that upscales an image to double its size
     :param x: The current block to upsample. Of shape [batch, h, w, ch]
@@ -60,33 +60,33 @@ def upsample(x):
     """
     h, w = x.shape[1:3]
 
-    up = tf.image.resize_images(x, size=[2*h, 2*w], method=tf.image.ResizeMethod.NEAREST_NEIGHBOR)
+    up = tf.image.resize_images(x, size=[h*scale[0], w*scale[1]], method=tf.image.ResizeMethod.NEAREST_NEIGHBOR)
 
     return up
 
 
-def downsample(x):
+def downsample(x, scale=(0.5, 0.5)):
     """
     Function that downsamples an image to half its size
     :param x: The current block of shape [batch_size, h, w, ch] to downsample
     :return: The downsampled block of shape [batch, 0.5*h, 0.5*w, ch]
     """
     h,w = x.shape[1:3]
-    h, w = int(0.5 * h.value), int(0.5 * w.value)
+    h, w = int(h.value * scale[0]), int(w.value * scale[1])
 
     down = tf.image.resize_images(x, size=[h, w], method=tf.image.ResizeMethod.NEAREST_NEIGHBOR)
 
     return down
 
 
-def conv_lay(x, filter_size, num_filters, scope, collection):
+def conv_lay(x, filter_size, num_filters, activation, scope):
     """
     Functio that creates a convolutional layer that uses filters with the given size
     :param x: Input layer of shape [batch_size, h, w, in_ch]
     :param filter_size: The size of the filters to be applied in the convolution operation
     :param num_filters: The number of filter maps i.e. the number of output channels
+    :param activation: activation function to be used
     :param scope: Name that is given to the layer
-    :param collection: Collection name to which we add the variables
     :return: The new layer that has been created
     """
 
@@ -97,25 +97,27 @@ def conv_lay(x, filter_size, num_filters, scope, collection):
 
         w = tf.get_variable(name="w", shape=filter_size+[in_ch, num_filters],
                             dtype=tf.float32, initializer=init, trainable=True)
-        tf.add_to_collection(collection, w)
 
         lay = tf.nn.convolution(input=x, filter=w, padding="SAME")
 
         b = tf.get_variable(name="bias", shape=[num_filters, ],
                             dtype=tf.float32, initializer=tf.zeros_initializer(dtype=tf.float32), trainable=True)
-        tf.add_to_collection(collection, b)
 
         lay += b
+
+        if activation == "leaky_relu":
+            return tf.nn.leaky_relu(lay)
+        elif activation == "relu":
+            return tf.nn.relu
 
     return lay
 
 
-def dense_lay(x, scope, collection):
+def dense_lay(x, scope):
     """
     Fully connected layer
     :param x: Input layer of shape [batch_size, h, w, in_ch]
     :param scope: Name of the scope
-    :param collection: Collection name to which we add the variables
     :return: The new dense layer that was created of shape [batch_size, 1, 1, 1]
     """
     with tf.variable_scope(scope, reuse=tf.AUTO_REUSE):
@@ -125,13 +127,11 @@ def dense_lay(x, scope, collection):
 
         w = tf.get_variable(name="w", shape=[h,w, in_ch, 1],
                             dtype=tf.float32, initializer=init, trainable=True)
-        tf.add_to_collection(collection, w)
 
         lay = tf.nn.convolution(input=x, filter=w, padding="VALID")
 
         b = tf.get_variable(name="bias", shape=[1, ],
                             dtype=tf.float32, initializer=tf.zeros_initializer(dtype=tf.float32), trainable=True)
-        tf.add_to_collection(collection, b)
 
         lay += b
 
