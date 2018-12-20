@@ -326,7 +326,7 @@ def train(g_weights=None, d_weights=None):
                 noise = np.random.normal(loc=0., scale=1., size=[batch_size, 1, 1, 128])
 
                 # train the discriminator on the fake images
-                gen_img = sess.run(gen_ops[format], feed_dict={real[j]: batch, fake[j]: noise})
+                gen_img = sess.run(gen_ops[format], feed_dict={real[j]: batch, fake[j]: noise, alpha: alpha})
                 _, discr_loss_ = sess.run([train_d_ops[format], d_loss_ops],
                                           feed_dict={real[j]: batch,
                                                      fake[j]: noise,
